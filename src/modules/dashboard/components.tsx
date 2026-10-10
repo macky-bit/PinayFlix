@@ -1234,11 +1234,11 @@ export function Hero({
   const [trailerKey, setTrailerKey] = useState<string | null>(null)
   const [showTrailer, setShowTrailer] = useState(false)
   const [trailerLoaded, setTrailerLoaded] = useState(false)
-  const [startupOverlayCleared, setStartupOverlayCleared] = useState(false)
+  const [trailerPlaying, setTrailerPlaying] = useState(false)
   const [heroVisible, setHeroVisible] = useState(true)
   const heroRef = useRef<HTMLElement>(null)
   const trailerRef = useRef<HTMLIFrameElement>(null)
-  const startupTimerRef = useRef<number | null>(null)
+  const trailerRevealTimerRef = useRef<number | null>(null)
   const dragStartRef = useRef<{
     x: number
     y: number
@@ -1313,7 +1313,7 @@ export function Hero({
     setTrailerKey(null)
     setShowTrailer(false)
     setTrailerLoaded(false)
-    setStartupOverlayCleared(false)
+    setTrailerPlaying(false)
 
     const timer = window.setTimeout(() => {
       if (!cancelled) setShowTrailer(true)
@@ -1326,11 +1326,56 @@ export function Hero({
     return () => {
       cancelled = true
       window.clearTimeout(timer)
-      if (startupTimerRef.current !== null) {
-        window.clearTimeout(startupTimerRef.current)
+      if (trailerRevealTimerRef.current !== null) {
+        window.clearTimeout(trailerRevealTimerRef.current)
+        trailerRevealTimerRef.current = null
       }
     }
   }, [show.id, show.mediaType])
+
+  useEffect(() => {
+    const handleTrailerMessage = (event: MessageEvent) => {
+      if (event.source !== trailerRef.current?.contentWindow) return
+
+      let message: { event?: string; info?: number } | null = null
+      try {
+        message =
+          typeof event.data === "string" ? JSON.parse(event.data) : event.data
+      } catch {
+        return
+      }
+
+      if (message?.event === "onReady") {
+        trailerRef.current?.contentWindow?.postMessage(
+          JSON.stringify({
+            event: "command",
+            func: "addEventListener",
+            args: ["onStateChange"],
+          }),
+          "*",
+        )
+        trailerRef.current?.contentWindow?.postMessage(
+          JSON.stringify({ event: "command", func: "playVideo", args: [] }),
+          "*",
+        )
+      }
+
+      if (message?.event === "onStateChange" && message.info === 1) {
+        if (trailerRevealTimerRef.current !== null) {
+          window.clearTimeout(trailerRevealTimerRef.current)
+        }
+        // Keep YouTube's startup transport controls behind the hero poster until
+        // its play, pause, rewind, and fast-forward overlay has auto-hidden.
+        trailerRevealTimerRef.current = window.setTimeout(() => {
+          setTrailerPlaying(true)
+          trailerRevealTimerRef.current = null
+        }, 5_000)
+      }
+    }
+
+    window.addEventListener("message", handleTrailerMessage)
+    return () => window.removeEventListener("message", handleTrailerMessage)
+  }, [trailerKey])
 
   useEffect(() => {
     const element = heroRef.current
@@ -1342,9 +1387,10 @@ export function Hero({
         setHeroVisible(visible)
         if (!visible) {
           setTrailerLoaded(false)
-          setStartupOverlayCleared(false)
-          if (startupTimerRef.current !== null) {
-            window.clearTimeout(startupTimerRef.current)
+          setTrailerPlaying(false)
+          if (trailerRevealTimerRef.current !== null) {
+            window.clearTimeout(trailerRevealTimerRef.current)
+            trailerRevealTimerRef.current = null
           }
         }
       },
@@ -1356,7 +1402,7 @@ export function Hero({
   }, [])
 
   const trailerVisible =
-    showTrailer && heroVisible && trailerLoaded && startupOverlayCleared
+    showTrailer && heroVisible && trailerLoaded && trailerPlaying
 
   useEffect(() => {
     if (!trailerVisible) return
@@ -1399,7 +1445,7 @@ export function Hero({
         <iframe
           ref={trailerRef}
           key={trailerKey}
-          className={`${styles.heroTrailer} ${trailerVisible ? styles.heroTrailerVisible : ""}`}
+          className={styles.heroTrailer}
           src={trailerUrl}
           title={`${show.title} trailer`}
           allow="autoplay; encrypted-media; picture-in-picture"
@@ -1407,15 +1453,32 @@ export function Hero({
           aria-hidden="true"
           onLoad={() => {
             setTrailerLoaded(true)
-            setStartupOverlayCleared(false)
-            if (startupTimerRef.current !== null) {
-              window.clearTimeout(startupTimerRef.current)
+            setTrailerPlaying(false)
+            if (trailerRevealTimerRef.current !== null) {
+              window.clearTimeout(trailerRevealTimerRef.current)
+              trailerRevealTimerRef.current = null
             }
-            startupTimerRef.current = window.setTimeout(
-              () => setStartupOverlayCleared(true),
-              4_000,
+            trailerRef.current?.contentWindow?.postMessage(
+              JSON.stringify({ event: "listening", id: "hero-trailer" }),
+              "*",
+            )
+            trailerRef.current?.contentWindow?.postMessage(
+              JSON.stringify({
+                event: "command",
+                func: "addEventListener",
+                args: ["onStateChange"],
+              }),
+              "*",
             )
           }}
+        />
+      )}
+      {heroVisible && trailerUrl && (
+        <img
+          src={bg}
+          alt=""
+          aria-hidden="true"
+          className={`${styles.heroTrailerCover} ${trailerVisible ? styles.heroTrailerCoverHidden : ""}`}
         />
       )}
       <div className={`absolute inset-0 ${styles.heroDim}`} />

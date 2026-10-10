@@ -1,5 +1,5 @@
 export const ADMIN_EDIT_DELAY_MS = 2000
-export const ADMIN_DELETE_DELAY_MS = 5000
+export const ADMIN_DELETE_DELAY_MS = 3000
 
 /** Keeps admin edit feedback visible long enough to clearly register. */
 export function waitForAdminEditDelay(

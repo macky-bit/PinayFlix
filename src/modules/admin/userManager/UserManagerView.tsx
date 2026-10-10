@@ -2078,25 +2078,14 @@ function SubscriptionsTab({ focusId }: { focusId?: string | null }) {
     } as Record<SubStatus, number>,
   )
 
-  function showSubscriptionStatus(status: SubStatus | "All") {
-    setStatusFilter(
-      status === "All" ? "All Subscription Statuses" : status,
-    )
+  function showSubscriptionStatus(status: SubStatus) {
+    setStatusFilter(status)
     setPage(1)
   }
 
   return (
     <div>
       <AdminStats>
-        <AdminStatCard
-          label="Total subscriptions"
-          value={subscriptions.length.toLocaleString()}
-          hint="All subscription records"
-          tone="purple"
-          active={statusFilter === "All Subscription Statuses"}
-          onClick={() => showSubscriptionStatus("All")}
-          actionLabel="Show all subscriptions"
-        />
         <AdminStatCard
           label="Active"
           value={subscriptionTotals.Active.toLocaleString()}

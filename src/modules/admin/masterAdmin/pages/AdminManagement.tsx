@@ -20,6 +20,7 @@ import ConfirmDialog from "../components/ConfirmDialog"
 
 import {
   AdminPageHeader,
+  AdminRowAction,
   AdminStatCard,
   AdminStats,
 } from "../../components/AdminUI"
@@ -2272,14 +2273,11 @@ export default function AdminManagement() {
                               </button>
                             ) : (
                               <>
-                                <button
-                                  type="button"
+                                <AdminRowAction
+                                  action="view"
+                                  name={m.name}
                                   onClick={() => setSelectedId(m.id)}
-                                  className="admin-manager-table__compact-action btn-wine py-1 rounded text-xs font-medium flex-shrink-0"
-                                  aria-label={`View details for ${m.name}`}
-                                >
-                                  View details
-                                </button>
+                                />
                                 <div className="relative">
                                   <button
                                     ref={(element) => {

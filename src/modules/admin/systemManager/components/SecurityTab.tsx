@@ -31,6 +31,8 @@ interface SecurityEvent {
   status: string;
 }
 
+type SecurityAction = "resolve" | "monitor" | "false-positive";
+
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All Security Events" },
@@ -91,8 +93,10 @@ export default function SecurityTab() {
   const [perPage, setPerPage] = useState(10);
 
   const [viewEvent, setViewEvent] = useState<SecurityEvent | null>(null);
-  const [confirmAction, setConfirmAction] = useState<{ event: SecurityEvent; action: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ event: SecurityEvent; action: SecurityAction } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [pendingStatuses, setPendingStatuses] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState("");
 
   const [showScanConfirm, setShowScanConfirm] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -101,13 +105,19 @@ export default function SecurityTab() {
 
   const events = useMemo(
     () =>
-      logState.items.filter(
-        (event) =>
-          event.eventType.toLowerCase().includes("security") ||
-          event.eventType.toLowerCase().includes("login") ||
-          event.severity === "Critical",
-      ),
-    [logState.items],
+      logState.items
+        .filter(
+          (event) =>
+            event.eventType.toLowerCase().includes("security") ||
+            event.eventType.toLowerCase().includes("login") ||
+            event.severity === "Critical",
+        )
+        .map((event) =>
+          pendingStatuses[event.id]
+            ? { ...event, status: pendingStatuses[event.id] }
+            : event,
+        ),
+    [logState.items, pendingStatuses],
   );
 
   const filtered = useMemo(() => {
@@ -129,41 +139,64 @@ export default function SecurityTab() {
     setSearch(""); setFilterType("all"); setFilterSev("all"); setFilterStatus("all"); setSort("newest"); setPage(1);
   }
 
-  function applyAction(event: SecurityEvent, action: string) {
-    const newStatus =
-      action === "resolve" ? "Resolved"
-      : action === "monitor" ? "Monitoring"
-      : action === "false-positive" ? "False Positive"
-      : event.status;
+  function statusForAction(action: SecurityAction) {
+    return action === "resolve"
+      ? "Resolved"
+      : action === "monitor"
+        ? "Monitoring"
+        : "False Positive";
+  }
+
+  async function persistStatus(event: SecurityEvent, action: SecurityAction) {
+    const newStatus = statusForAction(action);
+    setActionError("");
+    setPendingStatuses((current) => ({ ...current, [event.id]: newStatus }));
+    setViewEvent((current) =>
+      current?.id === event.id ? { ...current, status: newStatus } : current,
+    );
+
+    try {
+      await logState.update(event.id, { status: newStatus });
+    } catch (reason) {
+      setViewEvent((current) =>
+        current?.id === event.id ? { ...current, status: event.status } : current,
+      );
+      setActionError(
+        reason instanceof Error
+          ? reason.message
+          : `Could not mark security event ${event.id} as ${newStatus}.`,
+      );
+      throw reason;
+    } finally {
+      setPendingStatuses((current) => {
+        const next = { ...current };
+        delete next[event.id];
+        return next;
+      });
+    }
+  }
+
+  function applyAction(event: SecurityEvent, action: SecurityAction) {
     // require confirm for critical resolved / false positive
     if ((event.severity === "Critical" && action === "resolve") || action === "false-positive") {
       setConfirmAction({ event, action });
       return;
     }
-    void logState.update(event.id, { status: newStatus });
+    void persistStatus(event, action).catch(() => undefined);
   }
 
-  function confirmApply() {
+  async function confirmApply() {
     if (!confirmAction) return;
+    const requestedAction = confirmAction;
     setActionLoading(true);
-    void logState.update(confirmAction.event.id, {
-      status:
-        confirmAction.action === "resolve"
-          ? "Resolved"
-          : confirmAction.action === "false-positive"
-            ? "False Positive"
-            : confirmAction.event.status,
-    }).then(() => {
-      const newStatus =
-        confirmAction.action === "resolve" ? "Resolved"
-        : confirmAction.action === "false-positive" ? "False Positive"
-        : confirmAction.event.status;
-      if (viewEvent?.id === confirmAction.event.id) {
-        setViewEvent({ ...confirmAction.event, status: newStatus });
-      }
-      setActionLoading(false);
+    try {
+      await persistStatus(requestedAction.event, requestedAction.action);
       setConfirmAction(null);
-    }).catch(() => setActionLoading(false));
+    } catch {
+      // The inline error keeps the failed action visible and available to retry.
+    } finally {
+      setActionLoading(false);
+    }
   }
 
   function startScan() {
@@ -234,6 +267,13 @@ export default function SecurityTab() {
         </div>
       </div>
 
+      {actionError && (
+        <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-red-500/35 bg-red-950/25 px-4 py-3 text-sm text-red-200" role="alert">
+          <span>Security status update failed: {actionError}</span>
+          <button type="button" onClick={() => setActionError("")} className="shrink-0 font-semibold text-red-100 hover:text-white">Dismiss</button>
+        </div>
+      )}
+
       <div className="table-surface">
         <div className="security-table-frame">
           <table className="system-security-table text-sm" aria-label="Security Events">
@@ -266,12 +306,21 @@ export default function SecurityTab() {
                       <div className="content-table__actions security-table-actions">
                         <AdminRowAction action="view" name={`security event ${ev.id}`} onClick={() => setViewEvent(ev)} />
                         {ev.status !== "Resolved" && ev.status !== "False Positive" && (
-                          <button type="button" onClick={() => applyAction(ev, "resolve")} className="security-resolve-button" aria-label={`Resolve security event ${ev.id}`}>
-                            Resolve
+                          <button
+                            type="button"
+                            onClick={() => applyAction(ev, "resolve")}
+                            disabled={Boolean(pendingStatuses[ev.id])}
+                            className="content-table__action security-action--resolve"
+                            aria-label={`Resolve security event ${ev.id}`}
+                            title="Mark as resolved"
+                          >
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 4 4L19 6" />
+                            </svg>
                           </button>
                         )}
                         {ev.status !== "False Positive" && (
-                          <button type="button" onClick={() => applyAction(ev, "false-positive")} className="content-table__action security-action--false-positive" aria-label={`Mark security event ${ev.id} as false positive`} title="Mark as false positive">
+                          <button type="button" onClick={() => applyAction(ev, "false-positive")} disabled={Boolean(pendingStatuses[ev.id])} className="content-table__action security-action--false-positive" aria-label={`Mark security event ${ev.id} as false positive`} title="Mark as false positive">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                               <circle cx="12" cy="12" r="8" strokeWidth={2} />
                               <path strokeLinecap="round" strokeWidth={2} d="m9 9 6 6m0-6-6 6" />
@@ -295,18 +344,9 @@ export default function SecurityTab() {
         onClose={() => setViewEvent(null)}
         title="Security Event Details"
         footer={
-          <>
-            <button onClick={() => setViewEvent(null)} className="admin-details-button admin-details-button--secondary">Close</button>
-            {viewEvent && viewEvent.status !== "Monitoring" && viewEvent.status !== "Resolved" && viewEvent.status !== "False Positive" && (
-              <button onClick={() => { applyAction(viewEvent, "monitor"); setViewEvent(null); }} className="admin-details-button admin-details-button--secondary">Mark Monitoring</button>
-            )}
-            {viewEvent && viewEvent.status !== "Resolved" && viewEvent.status !== "False Positive" && (
-              <button onClick={() => { applyAction(viewEvent, "resolve"); setViewEvent(null); }} className="admin-details-button admin-details-button--primary">Mark Resolved</button>
-            )}
-            {viewEvent && viewEvent.status !== "False Positive" && (
-              <button onClick={() => { applyAction(viewEvent, "false-positive"); setViewEvent(null); }} className="admin-details-button admin-details-button--secondary">False Positive</button>
-            )}
-          </>
+          viewEvent && viewEvent.status !== "Monitoring" && viewEvent.status !== "Resolved" && viewEvent.status !== "False Positive" ? (
+            <button onClick={() => { applyAction(viewEvent, "monitor"); setViewEvent(null); }} className="admin-details-button admin-details-button--secondary">Mark Monitoring</button>
+          ) : undefined
         }
       >
         {viewEvent && (
