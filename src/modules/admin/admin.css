@@ -893,17 +893,16 @@
 .content-refreshers-table .media-col-status { width: 13%; }
 .content-refreshers-table .media-col-actions { width: 14%; }
 .content-soundtracks-table .media-col-id { width: 11%; }
-.content-soundtracks-table .media-col-title { width: 17%; }
-.content-soundtracks-table .media-col-artist { width: 15%; }
-.content-soundtracks-table .media-col-content { width: 19%; }
-.content-soundtracks-table .media-col-timestamp { width: 11%; }
-.content-soundtracks-table .media-col-link { width: 12%; }
-.content-soundtracks-table .media-col-actions { width: 15%; }
+.content-soundtracks-table .media-col-title { width: 19%; }
+.content-soundtracks-table .media-col-artist { width: 17%; }
+.content-soundtracks-table .media-col-content { width: 23%; }
+.content-soundtracks-table .media-col-timestamp { width: 12%; }
+.content-soundtracks-table .media-col-actions { width: 18%; }
 
 @media (max-width: 900px) {
   .content-media-table-scroll { overflow-x: auto; }
   .content-refreshers-table { min-width: 62rem; }
-  .content-soundtracks-table { min-width: 52rem; }
+  .content-soundtracks-table { min-width: 46rem; }
 }
 
 @media (max-width: 1023px) {

@@ -160,7 +160,7 @@ export default function SoundtracksTab({ soundtracks, content, onAdd, onEdit, on
           <table className="content-media-table content-soundtracks-table border-collapse text-sm" style={{ backgroundColor: '#150D2A' }}>
             <colgroup>
               <col className="media-col-id" /><col className="media-col-title" /><col className="media-col-artist" /><col className="media-col-content" />
-              <col className="media-col-timestamp" /><col className="media-col-link" /><col className="media-col-actions" />
+              <col className="media-col-timestamp" /><col className="media-col-actions" />
             </colgroup>
             <thead>
               <tr style={{ borderBottom: '1px solid #374151' }}>
@@ -169,13 +169,12 @@ export default function SoundtracksTab({ soundtracks, content, onAdd, onEdit, on
                 <th style={thStyle}>Artist</th>
                 <th style={thStyle}>Associated Content</th>
                 <th style={thStyle}>Timestamp</th>
-                <th style={thStyle}>Streaming Link</th>
                 <th style={thStyle}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="py-14 text-center text-sm" style={{ color: '#9CA3AF' }}>
+                <tr><td colSpan={6} className="py-14 text-center text-sm" style={{ color: '#9CA3AF' }}>
                   {soundtracks.length === 0 ? 'No soundtrack entries have been added yet.' : 'No records match your search or selected filters.'}
                 </td></tr>
               )}
@@ -188,13 +187,6 @@ export default function SoundtracksTab({ soundtracks, content, onAdd, onEdit, on
                   <td className="px-3 py-3" style={{ color: '#9CA3AF' }}><span className="block truncate" title={s.artist}>{s.artist}</span></td>
                   <td className="px-3 py-3"><span className="truncate block text-white" title={getContentTitle(s.contentId)}>{getContentTitle(s.contentId)}</span></td>
                   <td className="px-3 py-3"><span className="font-mono text-xs" style={{ color: '#F5A800' }}>{s.timestamp || '—'}</span></td>
-                  <td className="px-3 py-3">
-                    {s.streamingLink ? (
-                      <a href={s.streamingLink} target="_blank" rel="noopener noreferrer" className="text-xs underline" style={{ color: '#A78BFA' }} onClick={(e) => e.stopPropagation()}>
-                        Open link
-                      </a>
-                    ) : <span style={{ color: '#374151' }}>—</span>}
-                  </td>
                   <td className="px-3 py-3">
                     <div className="content-table__actions">
                       <AdminRowAction action="view" name={s.songTitle || `soundtrack ${s.id}`} onClick={() => setViewId(s.id)} />
