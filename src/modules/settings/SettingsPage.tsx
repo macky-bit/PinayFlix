@@ -1,6 +1,13 @@
 import { useState, type ReactElement } from "react"
+
 import StreamFlixSelect from "../../components/StreamFlixSelect"
+
 import ToggleSwitch from "../../components/ToggleSwitch"
+
+import { supabase } from "../../lib/supabase"
+
+import { clearContinueWatching } from "../dashboard/continueWatchingStore"
+
 import styles from "./settings.module.css"
 
 interface Props {
@@ -9,7 +16,7 @@ interface Props {
 
 type Tab = "playback" | "notifications" | "privacy" | "appearance"
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab label: string }[] = [
   { id: "playback", label: "Playback" },
 
   { id: "notifications", label: "Notifications" },
@@ -21,13 +28,19 @@ const TABS: { id: Tab; label: string }[] = [
 
 function Select({
   value,
+
   options,
+
   onChange,
+
   ariaLabel,
 }: {
   value: string
+
   options: string[]
+
   onChange: (v: string) => void
+
   ariaLabel: string
 }) {
   return (
@@ -141,29 +154,41 @@ function NotificationsTab() {
   const rows = [
     {
       label: "Email updates",
+
       desc: "Receive news and product updates via email.",
+
       val: emailUpdates,
+
       set: setEmailUpdates,
     },
 
     {
       label: "New releases",
+
       desc: "Get notified when new titles are added.",
+
       val: newReleases,
+
       set: setNewReleases,
     },
 
     {
       label: "Recommendations",
+
       desc: "Personalised show and movie suggestions.",
+
       val: recommendations,
+
       set: setRecommendations,
     },
 
     {
       label: "Account alerts",
+
       desc: "Security and billing notifications.",
+
       val: accountAlerts,
+
       set: setAccountAlerts,
     },
   ]
@@ -196,6 +221,36 @@ function PrivacyTab() {
   const [searchHistory, setSearchHistory] = useState(true)
 
   const [personalised, setPersonalised] = useState(true)
+
+  const [clearingHistory, setClearingHistory] = useState(false)
+
+  const [historyMessage, setHistoryMessage] = useState("")
+
+  async function clearHistory() {
+    if (clearingHistory) return
+
+    if (!window.confirm("Permanently clear all watch history?")) return
+
+    setClearingHistory(true)
+
+    setHistoryMessage("")
+
+    const { error } = await supabase.rpc("clear_my_watch_history")
+
+    if (error) {
+      setHistoryMessage(error.message || "Watch history could not be cleared.")
+
+      setClearingHistory(false)
+
+      return
+    }
+
+    clearContinueWatching()
+
+    setHistoryMessage("Watch history cleared.")
+
+    setClearingHistory(false)
+  }
 
   return (
     <div className={styles.tabContent}>
@@ -250,8 +305,20 @@ function PrivacyTab() {
               Permanently remove all viewing history.
             </p>
           </div>
-          <button className={styles.dangerBtn}>Clear History</button>
+          <button
+            type="button"
+            className={styles.dangerBtn}
+            onClick={() => void clearHistory()}
+            disabled={clearingHistory}
+          >
+            {clearingHistory ? "Clearing…" : "Clear History"}
+          </button>
         </div>
+        {historyMessage && (
+          <p className={styles.settingDesc} role="status">
+            {historyMessage}
+          </p>
+        )}
       </div>
     </div>
   )

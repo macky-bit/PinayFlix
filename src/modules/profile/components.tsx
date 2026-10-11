@@ -1,29 +1,101 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+
 import StreamFlixSelect from "../../components/StreamFlixSelect"
+
 import { supabase } from "../../lib/supabase"
+
 import { useContinueWatching } from "../dashboard/continueWatchingStore"
+
 import styles from "./profile.module.css"
+
 import { MAX_PROFILE_NAME_LENGTH, normalizeProfileName } from "./profileName"
 
 type ProfileIdentity = {
   id: number
+
   name: string
+
   avatarPath: string
+
   avatarUrl: string
+
   isKids: boolean
+
   hasPin: boolean
+
   displayOrder: number
+
   joinedAt: string | null
 }
 
 type MemberProfileRow = {
   member_profile_id: number | string
+
   profile_name: string
+
   avatar_image: string | null
+
   is_kids: boolean
+
   has_pin: boolean
+
   display_order: number
+
   is_entitled: boolean
+}
+
+type ProfilePreferences = {
+  language: string
+
+  maturity: string
+}
+
+const PROFILE_PREFERENCES_KEY = "sf_profile_preferences_v1"
+
+const DEFAULT_PROFILE_PREFERENCES: ProfilePreferences = {
+  language: "English",
+
+  maturity: "All Maturity Ratings",
+}
+
+function readProfilePreferences(profileId: number): ProfilePreferences {
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(PROFILE_PREFERENCES_KEY) ?? "{}",
+    ) as Record<string, Partial<ProfilePreferences>>
+
+    return {
+      language:
+        stored[profileId]?.language ?? DEFAULT_PROFILE_PREFERENCES.language,
+
+      maturity:
+        stored[profileId]?.maturity ?? DEFAULT_PROFILE_PREFERENCES.maturity,
+    }
+  } catch {
+    return DEFAULT_PROFILE_PREFERENCES
+  }
+}
+
+function writeProfilePreferences(
+  profileId: number,
+
+  preferences: ProfilePreferences,
+) {
+  const stored = (() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem(PROFILE_PREFERENCES_KEY) ?? "{}",
+      ) as Record<string, ProfilePreferences>
+    } catch {
+      return {}
+    }
+  })()
+
+  localStorage.setItem(
+    PROFILE_PREFERENCES_KEY,
+
+    JSON.stringify({ ...stored, [profileId]: preferences }),
+  )
 }
 
 const isExternalAvatar = (value: string) =>
@@ -32,11 +104,17 @@ const isExternalAvatar = (value: string) =>
 function initialsFor(name: string) {
   return (
     name
+
       .trim()
+
       .split(/\s+/)
+
       .map((part) => part[0])
+
       .join("")
+
       .slice(0, 2)
+
       .toUpperCase() || "SF"
   )
 }
@@ -288,11 +366,15 @@ function SelectDropdown({
 
 function Avatar({
   initials,
+
   imageUrl,
+
   size = "sm",
 }: {
   initials: string
+
   imageUrl?: string
+
   size?: "sm" | "lg"
 }) {
   const sizeClass = size === "lg" ? "w-20 h-20 text-2xl" : "w-9 h-9 text-sm"
@@ -325,17 +407,24 @@ function Avatar({
 
 function EditProfileModal({
   profile,
+
   onClose,
+
   onSaved,
 }: {
   profile: ProfileIdentity
+
   onClose: () => void
-  onSaved: (name: string) => void
+
+  onSaved: (name: string, preferences: ProfilePreferences) => void
 }) {
   const [name, setName] = useState(profile.name)
-  const [lang, setLang] = useState("English")
 
-  const [maturity, setMaturity] = useState("All Maturity Ratings")
+  const initialPreferences = useRef(readProfilePreferences(profile.id)).current
+
+  const [lang, setLang] = useState(initialPreferences.language)
+
+  const [maturity, setMaturity] = useState(initialPreferences.maturity)
 
   const [saving, setSaving] = useState(false)
 
@@ -343,20 +432,31 @@ function EditProfileModal({
 
   const handleSave = async () => {
     setSaveError("")
+
     let normalizedName: string
+
     try {
       normalizedName = normalizeProfileName(name)
     } catch (reason) {
-      setSaveError(reason instanceof Error ? reason.message : "Enter a valid profile name.")
+      setSaveError(
+        reason instanceof Error
+          ? reason.message
+          : "Enter a valid profile name.",
+      )
+
       return
     }
 
     setSaving(true)
-    const { error } = await supabase.rpc("rename_my_member_profile", {
-      selected_profile_id: profile.id,
-      selected_profile_name: normalizedName,
-    })
-    setSaving(false)
+
+    const { error } =
+      normalizedName === profile.name
+        ? { error: null }
+        : await supabase.rpc("rename_my_member_profile", {
+            selected_profile_id: profile.id,
+
+            selected_profile_name: normalizedName,
+          })
 
     if (error) {
       setSaveError(
@@ -364,10 +464,17 @@ function EditProfileModal({
           ? "Another profile already uses this name."
           : error.message || "We couldn't update the profile name.",
       )
+
+      setSaving(false)
+
       return
     }
 
-    onSaved(normalizedName)
+    writeProfilePreferences(profile.id, { language: lang, maturity })
+
+    setSaving(false)
+
+    onSaved(normalizedName, { language: lang, maturity })
   }
 
   return (
@@ -426,12 +533,16 @@ function EditProfileModal({
               disabled={saving}
               onChange={(e) => {
                 setName(e.target.value)
+
                 setSaveError("")
               }}
               className="w-full bg-transparent border border-[var(--color-stone)] text-[var(--color-cream)] px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[var(--color-wine)]"
               style={{ fontFamily: "'Barlow', sans-serif" }}
             />
-            <p className="mt-1 text-right text-xs text-[var(--color-taupe)]" aria-live="polite">
+            <p
+              className="mt-1 text-right text-xs text-[var(--color-taupe)]"
+              aria-live="polite"
+            >
               {name.length}/{MAX_PROFILE_NAME_LENGTH}
             </p>
           </div>
@@ -512,7 +623,13 @@ function EditProfileModal({
           </button>
           <button
             onClick={() => void handleSave()}
-            disabled={saving || !name.trim() || name.trim() === profile.name}
+            disabled={
+              saving ||
+              !name.trim() ||
+              (name.trim() === profile.name &&
+                lang === initialPreferences.language &&
+                maturity === initialPreferences.maturity)
+            }
             className="flex-1 py-2.5 bg-[var(--color-wine)] text-[var(--color-cream)] text-sm rounded-sm hover:bg-[var(--color-ink-soft)] transition-colors"
             style={{ fontFamily: "'Barlow', sans-serif" }}
           >
@@ -528,6 +645,7 @@ function EditProfileModal({
 
 function PINModal({
   profileId,
+
   hasPin,
 
   onClose,
@@ -552,24 +670,31 @@ function PINModal({
 
   async function savePin(selectedPin: string | null) {
     if (saving) return
+
     setSaving(true)
+
     setError("")
 
     const { error: saveError } = await supabase.rpc(
       "set_my_member_profile_pin",
+
       {
         selected_profile_id: profileId,
+
         selected_pin: selectedPin,
       },
     )
 
     if (saveError) {
       setError(saveError.message || "The profile PIN could not be saved.")
+
       setSaving(false)
+
       return
     }
 
     setSaving(false)
+
     onSaved(selectedPin !== null)
   }
 
@@ -692,7 +817,12 @@ function PINModal({
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || pin.length !== 4 || confirm.length !== 4 || pin !== confirm}
+            disabled={
+              saving ||
+              pin.length !== 4 ||
+              confirm.length !== 4 ||
+              pin !== confirm
+            }
             className="flex-1 py-2.5 bg-[var(--color-wine)] text-[var(--color-cream)] text-sm rounded-sm hover:bg-[var(--color-ink-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ fontFamily: "'Barlow', sans-serif" }}
           >
@@ -718,25 +848,37 @@ function PINModal({
 
 function DeleteProfileModal({
   profile,
+
   onClose,
+
   onDeleted,
 }: {
   profile: ProfileIdentity
+
   onClose: () => void
+
   onDeleted: () => void
 }) {
   const [confirmation, setConfirmation] = useState("")
+
   const [deleting, setDeleting] = useState(false)
+
   const [error, setError] = useState("")
-  const canDelete = confirmation.trim() === profile.name
+
+  const canDelete =
+    confirmation.trim().toLocaleLowerCase() ===
+    profile.name.trim().toLocaleLowerCase()
 
   const handleDelete = async () => {
     if (!canDelete || deleting) return
 
     setDeleting(true)
+
     setError("")
+
     const { error: deleteError } = await supabase.rpc(
       "delete_my_member_profile",
+
       { selected_profile_id: profile.id },
     )
 
@@ -746,7 +888,9 @@ function DeleteProfileModal({
           ? "You cannot delete the only profile on your account. Create another profile first."
           : deleteError.message || "The profile could not be deleted.",
       )
+
       setDeleting(false)
+
       return
     }
 
@@ -755,6 +899,7 @@ function DeleteProfileModal({
         detail: { profileId: profile.id },
       }),
     )
+
     onDeleted()
   }
 
@@ -775,6 +920,7 @@ function DeleteProfileModal({
         className="w-full max-w-md rounded-sm p-7"
         style={{
           background: "var(--color-ink-soft)",
+
           border: "1px solid rgba(248, 113, 113, 0.55)",
         }}
       >
@@ -803,22 +949,26 @@ function DeleteProfileModal({
         >
           This removes{" "}
           <strong className="text-[var(--color-cream)]">{profile.name}</strong>{" "}
-          from your profile picker. Watch history and profile preferences will no longer be available.
+          from your profile picker. Watch history and profile preferences will
+          no longer be available.
         </p>
         <label
           htmlFor="delete-profile-confirmation"
           className="mt-5 block text-xs uppercase tracking-wider text-[var(--color-taupe)]"
           style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
         >
-          Type {profile.name} to confirm
+          Enter the profile name below to confirm:{" "}
+          <strong className="text-[var(--color-cream)]">{profile.name}</strong>
         </label>
         <input
           id="delete-profile-confirmation"
           autoFocus
           value={confirmation}
+          placeholder={profile.name}
           disabled={deleting}
           onChange={(event) => {
             setConfirmation(event.target.value)
+
             setError("")
           }}
           className="mt-2 w-full rounded-sm border border-[var(--color-stone)] bg-transparent px-3 py-2 text-sm text-[var(--color-cream)] outline-none focus:border-red-400"
@@ -855,29 +1005,45 @@ function DeleteProfileModal({
 
 type WatchHistoryRow = {
   content_id: number | string
+
   title: string
+
   thumbnail: string | null
+
   watch_date: string
+
   last_playback: number | null
+
   runtime: number | null
 }
 
 type WatchHistoryItem = {
   key: string
+
   contentId: number | null
+
   continueId: number | null
+
   mediaType?: "movie" | "tv"
+
   title: string
+
   subtitle: string
+
   date: string
+
   img: string
+
   updatedAt: number
 }
 
 function formatPlaybackTime(seconds: number) {
   const safeSeconds = Math.max(0, Math.floor(seconds))
+
   const hours = Math.floor(safeSeconds / 3600)
+
   const minutes = Math.floor((safeSeconds % 3600) / 60)
+
   const remainingSeconds = safeSeconds % 60
 
   return hours > 0
@@ -887,40 +1053,56 @@ function formatPlaybackTime(seconds: number) {
 
 function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<WatchHistoryItem[]>([])
+
   const [loading, setLoading] = useState(true)
+
   const [error, setError] = useState("")
+
   const {
     entries: continueEntries,
+
     remove: removeContinueEntry,
   } = useContinueWatching(null)
 
   const loadHistory = useCallback(async () => {
     setLoading(true)
+
     setError("")
 
     const { data, error: historyError } = await supabase.rpc(
       "get_my_watch_history",
     )
+
     if (historyError) throw historyError
 
     const rows = (data ?? []) as WatchHistoryRow[]
+
     setItems(
       rows.map((row) => ({
         key: `history:${row.content_id}`,
+
         contentId: Number(row.content_id),
+
         continueId: null,
+
         title: row.title,
+
         subtitle: `${formatPlaybackTime(row.last_playback ?? 0)} watched${
           row.runtime ? ` · ${row.runtime} min` : ""
         }`,
+
         date: new Intl.DateTimeFormat(undefined, {
           dateStyle: "medium",
+
           timeStyle: "short",
         }).format(new Date(row.watch_date)),
+
         img: row.thumbnail?.trim() ?? "",
+
         updatedAt: new Date(row.watch_date).getTime(),
       })),
     )
+
     setLoading(false)
   }, [])
 
@@ -931,6 +1113,7 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
           ? loadError.message
           : "Watch history could not be loaded.",
       )
+
       setLoading(false)
     })
   }, [loadHistory])
@@ -944,11 +1127,13 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
 
     const { error: removeError } = await supabase.rpc(
       "delete_my_watch_history_entry",
+
       { selected_content_id: item.contentId },
     )
 
     if (removeError) {
       setError(removeError.message)
+
       return
     }
 
@@ -960,36 +1145,54 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
   const remoteItemsByTitle = new Map(
     items.map((item) => [item.title.trim().toLocaleLowerCase(), item]),
   )
+
   const continueItems: WatchHistoryItem[] = continueEntries.map((entry) => {
     const titleKey = entry.show.title.trim().toLocaleLowerCase()
+
     const remoteItem = remoteItemsByTitle.get(titleKey)
+
     const progress = Math.max(0, Math.min(100, Math.round(entry.progress)))
 
     return {
       key: `continue:${entry.show.mediaType ?? "movie"}:${entry.show.id}`,
+
       contentId: remoteItem?.contentId ?? null,
+
       continueId: entry.show.id,
+
       mediaType: entry.show.mediaType,
+
       title: entry.show.title,
-      subtitle: `${entry.episodeLabel ? `${entry.episodeLabel} · ` : ""}${progress}% watched`,
+
+      subtitle: `${
+        entry.episodeLabel ? `${entry.episodeLabel} · ` : ""
+      }${progress}% watched`,
+
       date: new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
+
         timeStyle: "short",
       }).format(new Date(entry.updatedAt)),
+
       img: entry.show.image,
+
       updatedAt: entry.updatedAt,
     }
   })
+
   const continueTitles = new Set(
     continueItems.map((item) => item.title.trim().toLocaleLowerCase()),
   )
+
   const visibleItems = [...continueItems, ...items].filter(
     (item, index, combined) =>
       !(
         item.continueId === null &&
         continueTitles.has(item.title.trim().toLocaleLowerCase())
-      ) && combined.findIndex((candidate) => candidate.key === item.key) === index,
+      ) &&
+      combined.findIndex((candidate) => candidate.key === item.key) === index,
   )
+
   visibleItems.sort((first, second) => second.updatedAt - first.updatedAt)
 
   return (
@@ -1125,31 +1328,45 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
 
 function ManageProfilesModal({
   activeProfileId,
+
   onClose,
+
   onActiveProfileDeleted,
 }: {
   activeProfileId: number | null
+
   onClose: () => void
+
   onActiveProfileDeleted: () => void
 }) {
   const [profiles, setProfiles] = useState<MemberProfileRow[]>([])
+
   const [loading, setLoading] = useState(true)
+
   const [error, setError] = useState("")
+
   const [profileToDelete, setProfileToDelete] =
     useState<ProfileIdentity | null>(null)
 
   const loadProfiles = useCallback(async () => {
     setLoading(true)
+
     setError("")
+
     const { data, error: profilesError } = await supabase.rpc(
       "get_my_member_profiles",
     )
+
     if (profilesError) {
       setError(profilesError.message || "Profiles could not be loaded.")
+
       setLoading(false)
+
       return
     }
+
     setProfiles((data ?? []) as MemberProfileRow[])
+
     setLoading(false)
   }, [])
 
@@ -1159,12 +1376,19 @@ function ManageProfilesModal({
 
   const identityFor = (profile: MemberProfileRow): ProfileIdentity => ({
     id: Number(profile.member_profile_id),
+
     name: profile.profile_name,
+
     avatarPath: profile.avatar_image?.trim() ?? "",
+
     avatarUrl: "",
+
     isKids: profile.is_kids,
+
     hasPin: profile.has_pin,
+
     displayOrder: profile.display_order,
+
     joinedAt: null,
   })
 
@@ -1220,7 +1444,9 @@ function ManageProfilesModal({
               style={{ borderBottom: "1px solid var(--color-stone)" }}
             >
               <div
-                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm bg-[var(--color-wine)] text-sm font-bold text-[var(--color-cream)] ${p.is_entitled ? "" : "grayscale opacity-50"}`}
+                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-sm bg-[var(--color-wine)] text-sm font-bold text-[var(--color-cream)] ${
+                  p.is_entitled ? "" : "grayscale opacity-50"
+                }`}
                 style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
               >
                 {initialsFor(p.profile_name)}
@@ -1266,13 +1492,16 @@ function ManageProfilesModal({
           profile={profileToDelete}
           onClose={() => setProfileToDelete(null)}
           onDeleted={() => {
-            const deletedActiveProfile =
-              profileToDelete.id === activeProfileId
+            const deletedActiveProfile = profileToDelete.id === activeProfileId
+
             setProfileToDelete(null)
+
             if (deletedActiveProfile) {
               onActiveProfileDeleted()
+
               return
             }
+
             void loadProfiles()
           }}
         />
@@ -1526,38 +1755,52 @@ const INITIAL_CARDS: CardData[] = []
 
 export function ProfileView({
   activeProfileId,
+
   onProfileDeleted,
 }: {
   activeProfileId: number | null
+
   onProfileDeleted: () => void
 }) {
   const [profileIdentity, setProfileIdentity] =
     useState<ProfileIdentity | null>(null)
+
   const [identityLoading, setIdentityLoading] = useState(true)
+
   const [identityError, setIdentityError] = useState("")
 
   const loadProfileIdentity = useCallback(async () => {
     setIdentityLoading(true)
+
     setIdentityError("")
 
     const { data: authData, error: authError } = await supabase.auth.getUser()
+
     if (authError) throw authError
+
     if (!authData.user)
       throw new Error("You must be signed in to view this profile.")
 
     const [profilesResult, accountResult] = await Promise.all([
       supabase.rpc("get_my_member_profiles"),
+
       supabase
+
         .from("user")
+
         .select("joined_at")
+
         .eq("auth_user_id", authData.user.id)
+
         .maybeSingle(),
     ])
 
     if (profilesResult.error) throw profilesResult.error
+
     if (accountResult.error) throw accountResult.error
 
     const rows = (profilesResult.data ?? []) as MemberProfileRow[]
+
     const selectedRow =
       rows.find((row) => Number(row.member_profile_id) === activeProfileId) ??
       rows[0] ??
@@ -1565,31 +1808,46 @@ export function ProfileView({
 
     if (!selectedRow) {
       setProfileIdentity(null)
+
       setIdentityLoading(false)
+
       return
     }
 
     const avatarPath = selectedRow.avatar_image?.trim() ?? ""
+
     let avatarUrl = isExternalAvatar(avatarPath) ? avatarPath : ""
+
     if (avatarPath && !avatarUrl) {
       const { data: avatarData } = await supabase.storage
+
         .from("avatar")
+
         .createSignedUrl(avatarPath, 60 * 60)
+
       avatarUrl = avatarData?.signedUrl ?? ""
     }
 
     setProfileIdentity({
       id: Number(selectedRow.member_profile_id),
+
       name: selectedRow.profile_name,
+
       avatarPath,
+
       avatarUrl,
+
       isKids: selectedRow.is_kids,
+
       hasPin: selectedRow.has_pin,
+
       displayOrder: selectedRow.display_order,
+
       joinedAt: accountResult.data?.joined_at
         ? String(accountResult.data.joined_at)
         : null,
     })
+
     setIdentityLoading(false)
   }, [activeProfileId])
 
@@ -1600,11 +1858,13 @@ export function ProfileView({
           ? error.message
           : "Profile identity could not be loaded.",
       )
+
       setIdentityLoading(false)
     })
   }, [loadProfileIdentity])
 
   // Settings state
+
   const [maturity, setMaturity] = useState("All Maturity Ratings")
 
   const [language, setLanguage] = useState("English")
@@ -1612,6 +1872,18 @@ export function ProfileView({
   const [dirty, setDirty] = useState(false)
 
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!profileIdentity) return
+
+    const preferences = readProfilePreferences(profileIdentity.id)
+
+    setMaturity(preferences.maturity)
+
+    setLanguage(preferences.language)
+
+    setDirty(false)
+  }, [profileIdentity?.id])
 
   // Modals
 
@@ -1636,6 +1908,10 @@ export function ProfileView({
   }
 
   function handleSave() {
+    if (!profileIdentity) return
+
+    writeProfilePreferences(profileIdentity.id, { language, maturity })
+
     setDirty(false)
 
     setSaved(true)
@@ -1646,6 +1922,7 @@ export function ProfileView({
   const joinedYear = profileIdentity?.joinedAt
     ? new Date(profileIdentity.joinedAt).getFullYear()
     : null
+
   const memberSinceYear =
     joinedYear && Number.isFinite(joinedYear) ? joinedYear : null
 
@@ -1656,15 +1933,23 @@ export function ProfileView({
         <EditProfileModal
           profile={profileIdentity}
           onClose={() => setEditOpen(false)}
-          onSaved={(name) => {
+          onSaved={(name, preferences) => {
             setProfileIdentity((current) =>
               current ? { ...current, name } : current,
             )
+
+            setLanguage(preferences.language)
+
+            setMaturity(preferences.maturity)
+
+            setDirty(false)
+
             window.dispatchEvent(
               new CustomEvent("streamflix:profile-updated", {
                 detail: { profileId: profileIdentity.id, name },
               }),
             )
+
             setEditOpen(false)
           }}
         />
@@ -1678,6 +1963,7 @@ export function ProfileView({
             setProfileIdentity((current) =>
               current ? { ...current, hasPin } : current,
             )
+
             setPinOpen(false)
           }}
         />
@@ -1757,9 +2043,9 @@ export function ProfileView({
               </p>
             </div>
             <button
-            type="button"
-            onClick={() => setEditOpen(true)}
-            disabled={!profileIdentity || identityLoading}
+              type="button"
+              onClick={() => setEditOpen(true)}
+              disabled={!profileIdentity || identityLoading}
               className="px-5 py-2 border border-[var(--color-stone)] text-[var(--color-cream)] text-sm rounded-sm hover:border-[var(--color-taupe)] hover:bg-[var(--color-wine)] transition-all"
               style={{ fontFamily: "'Barlow', sans-serif" }}
             >

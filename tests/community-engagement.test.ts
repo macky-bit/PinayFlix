@@ -48,13 +48,17 @@ test("admin last-login timestamps are synchronized from Supabase Auth", () => {
   const migration = readFileSync(
     new URL(
       "../supabase/migrations/20261010234500_sync_admin_last_login.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(migration, /after update of last_sign_in_at on auth\.users/i)
+
   assert.match(migration, /last_login = new\.last_sign_in_at/i)
+
   assert.match(migration, /auth_user\.last_sign_in_at/i)
 })
 
@@ -115,16 +119,19 @@ test("each playback quality resolves to its matching local video asset", () => {
 test("studio clip completion returns to artwork without stopping the movie timer", () => {
   const playerSource = readFileSync(
     new URL("../src/modules/movie/fixedscreen/movie.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(
     playerSource,
+
     /onEnded=\{\(\) => \{[\s\S]*setClipEnded\(true\)[\s\S]*setPlaying\(true\)/,
   )
 
   assert.match(
     playerSource,
+
     /!clipStarted \|\| clipEnded \? styles\.playerVideoHidden/,
   )
 })
@@ -413,16 +420,21 @@ test("opening video runs after a profile card is clicked instead of login", () =
 test("dashboard requires the viewer profile selected for the current session", () => {
   const appSource = readFileSync(
     new URL("../src/App.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(
     appSource,
+
     /page === "dashboard" && activeProfile === null[\s\S]*setPage\("profileSelect"\)/,
   )
+
   assert.match(appSource, /page === "dashboard" && activeProfile &&/)
+
   assert.match(
     appSource,
+
     /onBack=\{\(\) => setPage\(activeProfile \? "dashboard" : "profileSelect"\)\}/,
   )
 })
@@ -444,6 +456,7 @@ test("opening video uses its own public media bucket", () => {
 
   assert.match(
     sql,
+
     /drop policy if exists authenticated_can_read_streamflix_opening/i,
   )
 })
@@ -628,30 +641,45 @@ test("active Stripe subscriptions can replace their plan without a duplicate che
   const checkoutSource = readFileSync(
     new URL(
       "../supabase/functions/create-checkout-session/index.ts",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const webhookSource = readFileSync(
     new URL("../supabase/functions/stripe-webhook/index.ts", import.meta.url),
+
     "utf8",
   )
+
   const syncSql = readFileSync(
     new URL(
       "../supabase/migrations/20261010220000_manage_stripe_subscription.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(checkoutSource, /stripe\.subscriptions\.update/)
+
   assert.match(checkoutSource, /id: subscription\.items\.data\[0\]\.id/)
+
   assert.match(checkoutSource, /price: selectedPrice/)
+
   assert.match(checkoutSource, /proration_behavior: "none"/)
+
   assert.match(checkoutSource, /cancel_at_period_end: false/)
+
   assert.doesNotMatch(checkoutSource, /An active subscription already exists/)
+
   assert.match(webhookSource, /sync_stripe_subscription_plan/)
+
   assert.match(syncSql, /SET subscription_id = selected_plan_id/i)
+
   assert.match(syncSql, /FROM PUBLIC, anon, authenticated/i)
 })
 
@@ -659,22 +687,36 @@ test("membership cancellation is authenticated, immediate, and returns to subscr
   const cancelSource = readFileSync(
     new URL(
       "../supabase/functions/cancel-subscription/index.ts",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const accountSource = readFileSync(
     new URL("../src/modules/account/components.tsx", import.meta.url),
+
     "utf8",
   )
-  const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8")
+
+  const appSource = readFileSync(
+    new URL("../src/App.tsx", import.meta.url),
+    "utf8",
+  )
 
   assert.match(cancelSource, /serviceClient\.auth\.getUser/)
+
   assert.match(cancelSource, /stripe\.subscriptions\.cancel/)
+
   assert.match(cancelSource, /invoice_now: false, prorate: false/)
+
   assert.match(accountSource, /functions\.invoke\("cancel-subscription"/)
+
   assert.match(accountSource, /onSubscriptionCancelled\(\)/)
+
   assert.match(appSource, /setPlan\(null\)/)
+
   assert.match(appSource, /setPage\("subscription"\)/)
 })
 
@@ -692,9 +734,13 @@ test("movie soundtrack uses database audio and lyrics instead of placeholders", 
   )
 
   assert.match(playerSource, /ref=\{soundtrackAudioRef\}/)
+
   assert.match(playerSource, /audio\.src = track\.audioUrl/)
+
   assert.match(playerSource, /toggleSoundtrackPlayback\(track\)/)
+
   assert.match(playerSource, /`Pause \$\{track\.title\}`/)
+
   assert.doesNotMatch(playerSource, /Open \$\{track\.title\} on YouTube/)
 
   assert.match(playerSource, /lyricsTrack\.lyrics/)
@@ -708,10 +754,15 @@ test("movie soundtrack uses database audio and lyrics instead of placeholders", 
   assert.match(soundtrackSource, /\.from\("soundtrack"\)/)
 
   assert.match(soundtrackSource, /stream_link/)
+
   assert.match(soundtrackSource, /createSignedUrl/)
+
   assert.match(soundtrackSource, /SPIDER_MAN_SOUNDTRACK_OBJECT/)
+
   assert.match(soundtrackSource, /lyrics_instrumental/)
+
   assert.match(soundtrackSource, /lyrics_source_url/)
+
   assert.match(playerSource, /track\.instrumental/)
 })
 
@@ -719,99 +770,154 @@ test("soundtrack lyrics are cached in a private provenance-aware bucket", () => 
   const migration = readFileSync(
     new URL(
       "../supabase/migrations/20261010231500_store_soundtrack_lyrics.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const syncSource = readFileSync(
     new URL("../scripts/sync-soundtrack-lyrics.mjs", import.meta.url),
+
     "utf8",
   )
 
   assert.match(migration, /'soundtrack-lyrics'/)
+
   assert.match(migration, /false,\s*524288/)
-  assert.match(migration, /TO authenticated[\s\S]*FOR SELECT|FOR SELECT[\s\S]*TO authenticated/i)
+
+  assert.match(
+    migration,
+    /TO authenticated[\s\S]*FOR SELECT|FOR SELECT[\s\S]*TO authenticated/i,
+  )
+
   assert.match(migration, /lyrics_source_url text/i)
+
   assert.match(syncSource, /loadTrackLyrics/)
+
   assert.match(syncSource, /lyrics\.txt/)
+
   assert.match(syncSource, /lyrics\.lrc/)
+
   assert.match(syncSource, /\$\{rangeStart\}-\$\{rangeEnd\}_content/)
+
   assert.match(syncSource, /\$\{contentId\}-\$\{slugify\(title\)\}/)
+
   assert.match(syncSource, /SUPABASE_SERVICE_ROLE_KEY/)
+
   assert.doesNotMatch(syncSource, /VITE_SUPABASE_SERVICE/)
 })
 
 test("movie refresher resolves and caches verified Wikipedia content", () => {
   const movieSource = readFileSync(
     new URL("../src/modules/movie/fixedscreen/movie.tsx", import.meta.url),
+
     "utf8",
   )
+
   const clientSource = readFileSync(
     new URL("../src/modules/movie/refresher.ts", import.meta.url),
+
     "utf8",
   )
+
   const functionSource = readFileSync(
     new URL(
       "../supabase/functions/wikipedia-refresher/index.ts",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const migration = readFileSync(
     new URL(
       "../supabase/migrations/20261010224500_add_wikipedia_refresher_cache.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(clientSource, /wikipedia-refresher/)
+
   assert.match(movieSource, /loadWikipediaRefresher/)
+
   assert.match(movieSource, /Source: \{refresherState\.result\.sourceName\}/)
+
   assert.doesNotMatch(movieSource, /waiting for a verified refresher source/i)
+
   assert.match(functionSource, /\.from\("content"\)/)
-  assert.match(functionSource, /en\.wikipedia\.org\/w\/rest\.php\/v1\/search\/page/)
+
+  assert.match(
+    functionSource,
+    /en\.wikipedia\.org\/w\/rest\.php\/v1\/search\/page/,
+  )
+
   assert.match(functionSource, /previous_film_refresher/)
+
   assert.match(migration, /source_url text/i)
+
   assert.match(migration, /key_events jsonb/i)
 })
 
 test("refresher video hands off to the selected studio clip without advancing movie progress", () => {
   const movieSource = readFileSync(
     new URL("../src/modules/movie/fixedscreen/movie.tsx", import.meta.url),
+
     "utf8",
   )
+
   const videoSource = readFileSync(
     new URL("../src/modules/movie/refresherVideo.ts", import.meta.url),
+
     "utf8",
   )
+
   const storagePolicy = readFileSync(
     new URL(
       "../supabase/migrations/20261010230000_allow_authenticated_refresher_video_read.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(videoSource, /refresher_video_url/)
+
   assert.match(videoSource, /refresher_all\.mp4/)
+
   assert.match(videoSource, /createSignedUrl/)
+
   assert.match(movieSource, /Play Refresher/)
+
   assert.match(movieSource, />\s*Skip Refresher\s*</)
+
   assert.match(movieSource, /if \(!playing \|\| refresherVideoPlaying\) return/)
+
   assert.match(movieSource, /finishRefresherVideo\(\)/)
+
   assert.match(
     movieSource,
+
     /const finishRefresherVideo[\s\S]*setRefresherVideoPlaying\(false\)[\s\S]*setClipEnded\(false\)[\s\S]*setPlaying\(true\)/,
   )
+
   assert.match(storagePolicy, /TO authenticated/i)
+
   assert.match(storagePolicy, /bucket_id = 'refresher_video_url'/i)
 })
 
 test("lyrics lookup accepts an exact title and artist match", () => {
   const match = selectBestLyricsMatch(
     "Breaking Bad Main Title Theme",
+
     "Dave Porter - Topic",
+
     [
       {
         id: 1,
@@ -888,6 +994,7 @@ test("profile PINs are persisted and gate locked profile selection", () => {
   const selectorSource = readFileSync(
     new URL(
       "../src/modules/profileSelect/ProfileSelectPage.tsx",
+
       import.meta.url,
     ),
 
@@ -928,6 +1035,7 @@ test("profile PIN verification is owner-scoped, hashed, and rate limited", () =>
 
   assert.match(
     sql,
+
     /extensions\.crypt\(selected_pin, stored_pin_hash\) = stored_pin_hash/i,
   )
 
@@ -937,6 +1045,7 @@ test("profile PIN verification is owner-scoped, hashed, and rate limited", () =>
 
   assert.match(
     sql,
+
     /revoke all on function public\.verify_my_member_profile_pin/i,
   )
 
@@ -944,22 +1053,35 @@ test("profile PIN verification is owner-scoped, hashed, and rate limited", () =>
 })
 
 test("normal movie playback records watch history and the profile loads it", () => {
-  const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8")
-  const movieSource = readFileSync(
-    new URL("../src/modules/movie/fixedscreen/movie.tsx", import.meta.url),
+  const appSource = readFileSync(
+    new URL("../src/App.tsx", import.meta.url),
     "utf8",
   )
+
+  const movieSource = readFileSync(
+    new URL("../src/modules/movie/fixedscreen/movie.tsx", import.meta.url),
+
+    "utf8",
+  )
+
   const profileSource = readFileSync(
     new URL("../src/modules/profile/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(movieSource, /recordWatchProgress\(/)
+
   assert.match(movieSource, /playbackSeconds - previousSync\.playbackSeconds/)
+
   assert.match(appSource, /onProgress=\{\(progress\) => addOrUpdateContinue/)
+
   assert.match(profileSource, /get_my_watch_history/)
+
   assert.match(profileSource, /delete_my_watch_history_entry/)
+
   assert.match(profileSource, /useContinueWatching\(null\)/)
+
   assert.doesNotMatch(profileSource, /const HISTORY_ITEMS/)
 })
 
@@ -967,17 +1089,27 @@ test("watch history RPCs are authenticated and owner scoped", () => {
   const sql = readFileSync(
     new URL(
       "../supabase/migrations/20261010201500_watch_history_profile_integration.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(sql, /security definer/gi)
+
   assert.match(sql, /account\.auth_user_id = auth\.uid\(\)/i)
-  assert.match(sql, /grant execute on function public\.record_my_watch_progress/i)
-  assert.match(sql, /grant execute on function public\.get_my_watch_history/i)
+
   assert.match(
     sql,
+    /grant execute on function public\.record_my_watch_progress/i,
+  )
+
+  assert.match(sql, /grant execute on function public\.get_my_watch_history/i)
+
+  assert.match(
+    sql,
+
     /grant execute on function public\.delete_my_watch_history_entry/i,
   )
 })
@@ -985,19 +1117,27 @@ test("watch history RPCs are authenticated and owner scoped", () => {
 test("profile menu routes every account action through one handler", () => {
   const dashboardSource = readFileSync(
     new URL("../src/modules/dashboard/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(dashboardSource, /label: "Profile", page: "profile"/)
+
   assert.match(dashboardSource, /label: "Account", page: "account"/)
+
   assert.match(dashboardSource, /label: "Settings", page: "settings"/)
+
   assert.match(dashboardSource, /label: "Help Center", page: "help"/)
+
   assert.match(
     dashboardSource,
+
     /onClick=\{\(\) => navigateFromAccountMenu\(item\.page\)\}/,
   )
+
   assert.match(
     dashboardSource,
+
     /onClick=\{\(\) => navigateFromAccountMenu\("account"\)\}/,
   )
 })
@@ -1005,99 +1145,206 @@ test("profile menu routes every account action through one handler", () => {
 test("Account and Settings share the Settings-style toggle switch", () => {
   const accountSource = readFileSync(
     new URL("../src/modules/account/components.tsx", import.meta.url),
+
     "utf8",
   )
+
   const settingsSource = readFileSync(
     new URL("../src/modules/settings/SettingsPage.tsx", import.meta.url),
+
     "utf8",
   )
+
   const toggleSource = readFileSync(
     new URL("../src/components/ToggleSwitch.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(accountSource, /ToggleSwitch/)
+
   assert.match(settingsSource, /ToggleSwitch/)
+
   assert.doesNotMatch(accountSource, /className="relative w-10 h-5/)
+
   assert.match(toggleSource, /role="switch"/)
+
   assert.match(toggleSource, /styles\.toggleThumbOn/)
 })
 
 test("Profile no longer duplicates autoplay settings", () => {
   const profileSource = readFileSync(
     new URL("../src/modules/profile/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.doesNotMatch(profileSource, /Autoplay Next Episode/)
+
   assert.doesNotMatch(profileSource, /Autoplay Previews/)
+
   assert.doesNotMatch(profileSource, /function Toggle\(/)
+
   assert.doesNotMatch(profileSource, /Subtitle Appearance/)
+
   assert.doesNotMatch(profileSource, /function SubtitleIcon/)
 })
 
 test("kids profiles do not render maturity rating controls", () => {
   const profileSource = readFileSync(
     new URL("../src/modules/profile/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(profileSource, /!profile\.isKids &&/)
+
   assert.match(
     profileSource,
+
     /profileIdentity && !profileIdentity\.isKids &&/,
   )
 })
 
 test("profile settings delete the selected owned profile safely", () => {
-  const appSource = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8")
-  const profileSource = readFileSync(
-    new URL("../src/modules/profile/components.tsx", import.meta.url),
+  const appSource = readFileSync(
+    new URL("../src/App.tsx", import.meta.url),
     "utf8",
   )
+
+  const profileSource = readFileSync(
+    new URL("../src/modules/profile/components.tsx", import.meta.url),
+
+    "utf8",
+  )
+
   const sql = readFileSync(
     new URL(
       "../supabase/migrations/20261010213000_delete_my_member_profile.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(profileSource, /delete_my_member_profile/)
-  assert.match(profileSource, /Type \{profile\.name\} to confirm/)
+
+  assert.match(profileSource, /Enter the profile name below to confirm/)
+
+  assert.match(profileSource, /placeholder=\{profile\.name\}/)
+
   assert.match(appSource, /onProfileDeleted=\{\(\) => \{/)
+
   assert.match(appSource, /setPage\("profileSelect"\)/)
+
   assert.match(sql, /account\.auth_user_id = auth\.uid\(\)/i)
+
   assert.match(sql, /profile\.user_id = current_user_id/i)
+
   assert.match(sql, /active_profile_count <= 1/i)
+
   assert.match(sql, /is_active = false/i)
+
   assert.match(sql, /revoke all on function public\.delete_my_member_profile/i)
+})
+
+test("profile preferences persist and enable Save for non-name changes", () => {
+  const profileSource = readFileSync(
+    new URL("../src/modules/profile/components.tsx", import.meta.url),
+
+    "utf8",
+  )
+
+  assert.match(profileSource, /PROFILE_PREFERENCES_KEY/)
+
+  assert.match(profileSource, /writeProfilePreferences\(profile\.id/)
+
+  assert.match(profileSource, /lang === initialPreferences\.language/)
+
+  assert.match(profileSource, /maturity === initialPreferences\.maturity/)
+})
+
+test("Clear History removes remote history and local continue-watching data", () => {
+  const settingsSource = readFileSync(
+    new URL("../src/modules/settings/SettingsPage.tsx", import.meta.url),
+
+    "utf8",
+  )
+
+  const storeSource = readFileSync(
+    new URL(
+      "../src/modules/dashboard/continueWatchingStore.ts",
+
+      import.meta.url,
+    ),
+
+    "utf8",
+  )
+
+  const sql = readFileSync(
+    new URL(
+      "../supabase/migrations/20261011095000_clear_my_watch_history.sql",
+
+      import.meta.url,
+    ),
+
+    "utf8",
+  )
+
+  assert.match(settingsSource, /supabase\.rpc\("clear_my_watch_history"\)/)
+
+  assert.match(
+    settingsSource,
+    /window\.confirm\("Permanently clear all watch history\?"\)/,
+  )
+
+  assert.match(settingsSource, /clearContinueWatching\(\)/)
+
+  assert.match(storeSource, /export function clearContinueWatching\(\)/)
+
+  assert.match(sql, /delete from public\.watch_history/i)
+
+  assert.match(sql, /account\.auth_user_id = auth\.uid\(\)/i)
+
+  assert.match(sql, /grant execute.*authenticated/is)
 })
 
 test("kids profiles require Standard or Premium subscriptions", () => {
   const profileSelectSource = readFileSync(
     new URL(
       "../src/modules/profileSelect/ProfileSelectPage.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const sql = readFileSync(
     new URL(
       "../supabase/migrations/20261010214500_standard_premium_kids_profiles.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(sql, /lower\(plan\.plan_name\) IN \('standard', 'premium'\)/i)
+
   assert.match(
     sql,
+
     /lower\(plan_row\.plan_name\) NOT IN \('standard', 'premium'\)/i,
   )
+
   assert.match(sql, /Kids profiles require a Standard or Premium plan/i)
+
   assert.doesNotMatch(sql, /\('basic', 'premium'\)/i)
+
   assert.match(profileSelectSource, /context\?\.allows_kids \?\? false/)
+
   assert.match(profileSelectSource, /allowsKidsProfiles &&/)
 })
 
@@ -1105,29 +1352,46 @@ test("subscription downgrades disable overflow profiles without deleting them", 
   const profileSelectSource = readFileSync(
     new URL(
       "../src/modules/profileSelect/ProfileSelectPage.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const profileSettingsSource = readFileSync(
     new URL("../src/modules/profile/components.tsx", import.meta.url),
+
     "utf8",
   )
+
   const sql = readFileSync(
     new URL(
       "../supabase/migrations/20261010223000_disable_profiles_beyond_plan_limit.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(sql, /row_number\(\) OVER/i)
-  assert.match(sql, /ORDER BY profile\.display_order, profile\.member_profile_id/i)
+
+  assert.match(
+    sql,
+    /ORDER BY profile\.display_order, profile\.member_profile_id/i,
+  )
+
   assert.match(sql, /<= COALESCE\(entitlement\.max_user, 0\) AS is_entitled/i)
+
   assert.match(sql, /AND profile\.is_active/i)
+
   assert.match(profileSelectSource, /disabled=\{!profile\.isEntitled\}/)
+
   assert.match(profileSelectSource, /Unavailable on this plan/)
+
   assert.match(profileSettingsSource, /Disabled by current plan/)
+
   assert.match(profileSettingsSource, /delete_my_member_profile/)
 })
 
@@ -1135,27 +1399,39 @@ test("admin subscription records are view-only", () => {
   const userManagerSource = readFileSync(
     new URL(
       "../src/modules/admin/userManager/UserManagerView.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const masterAdminSource = readFileSync(
     new URL(
       "../src/modules/admin/masterAdmin/pages/UsersPage.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const subscriptionsTab = userManagerSource.slice(
     userManagerSource.indexOf("function SubscriptionsTab"),
+
     userManagerSource.indexOf("function PlansTab"),
   )
 
   assert.match(subscriptionsTab, /action="view"/)
+
   assert.doesNotMatch(subscriptionsTab, /action="edit"/)
+
   assert.doesNotMatch(subscriptionsTab, /Edit Subscription/)
+
   assert.doesNotMatch(subscriptionsTab, /subscriptionState\.update/)
+
   assert.doesNotMatch(masterAdminSource, /Cancel subscription\?/)
+
   assert.doesNotMatch(masterAdminSource, /setCancelSubId/)
 })
 
@@ -1163,27 +1439,37 @@ test("admin user-management navigation does not expose watch history", () => {
   const userManagerSource = readFileSync(
     new URL(
       "../src/modules/admin/userManager/UserManagerView.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const masterAdminSource = readFileSync(
     new URL(
       "../src/modules/admin/masterAdmin/pages/UsersPage.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const userManagerRoot = userManagerSource.slice(
     userManagerSource.indexOf("export default function UserManagerView"),
   )
+
   const masterTabs = masterAdminSource.slice(
     masterAdminSource.indexOf("const TABS"),
+
     masterAdminSource.indexOf("const paginatedSubscribers"),
   )
 
   assert.doesNotMatch(userManagerRoot, /label: "Watch History"/)
+
   assert.doesNotMatch(userManagerRoot, /tab === "watch"/)
+
   assert.doesNotMatch(masterTabs, /label: "Watch History"/)
 })
 
@@ -1191,50 +1477,78 @@ test("content management ranks Supabase stream totals in a filterable top ten", 
   const contentManagerSource = readFileSync(
     new URL(
       "../src/modules/admin/contentManager/ContentManagerView.tsx",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const repositorySource = readFileSync(
     new URL(
       "../src/modules/admin/data/supabaseAdminRepository.ts",
+
       import.meta.url,
     ),
+
     "utf8",
   )
+
   const seedMigration = readFileSync(
     new URL(
       "../supabase/migrations/20261010233000_seed_dashboard_top_stream_counts.sql",
+
       import.meta.url,
     ),
+
     "utf8",
   )
 
   assert.match(contentManagerSource, /Top 10 streamed titles/)
+
   assert.match(contentManagerSource, /right\.totalStreams - left\.totalStreams/)
+
   assert.match(contentManagerSource, /\.slice\(0, 10\)/)
+
   assert.match(contentManagerSource, /\["movies", "Movies"\]/)
+
   assert.match(contentManagerSource, /\["tv", "TV Series"\]/)
-  assert.match(repositorySource, /totalStreams: number\(row\.total_streams_count\)/)
+
+  assert.match(
+    repositorySource,
+    /totalStreams: number\(row\.total_streams_count\)/,
+  )
+
   assert.match(seedMigration, /row_number\(\) OVER/i)
-  assert.match(seedMigration, /SET total_streams_count = seeded_counts\.stream_count/i)
+
+  assert.match(
+    seedMigration,
+    /SET total_streams_count = seeded_counts\.stream_count/i,
+  )
 })
 
 test("dashboard footer keeps only support and legal links", () => {
   const componentsSource = readFileSync(
     new URL("../src/modules/dashboard/components.tsx", import.meta.url),
+
     "utf8",
   )
+
   const dashboardSource = readFileSync(
     new URL("../src/modules/dashboard/Dashboard.tsx", import.meta.url),
+
     "utf8",
   )
 
   for (const label of [
     "Help Center",
+
     "Terms of Use",
+
     "Privacy",
+
     "Cookie Preferences",
+
     "Contact Us",
   ]) {
     assert.match(componentsSource, new RegExp(`"${label}"`))
@@ -1242,59 +1556,86 @@ test("dashboard footer keeps only support and legal links", () => {
 
   for (const removedLabel of [
     "Audio Description",
+
     "Gift Cards",
+
     "Media Centre",
+
     "Investor Relations",
+
     "Jobs",
+
     "Corporate Information",
   ]) {
     assert.doesNotMatch(componentsSource, new RegExp(`"${removedLabel}"`))
   }
 
   assert.match(componentsSource, /onNavigateHelp/)
-  assert.match(dashboardSource, /onNavigateHelp=\{\(\) => onNavigate\("help"\)\}/)
+
+  assert.match(
+    dashboardSource,
+    /onNavigateHelp=\{\(\) => onNavigate\("help"\)\}/,
+  )
 })
 
 test("TMDB search disables titles outside the available Supabase catalog", () => {
   const searchSource = readFileSync(
     new URL("../src/modules/dashboard/SearchResultsPage.tsx", import.meta.url),
+
     "utf8",
   )
+
   const cardSource = readFileSync(
     new URL("../src/modules/dashboard/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(searchSource, /\.from\("content"\)/)
+
   assert.match(searchSource, /\.eq\("availability_status", "available"\)/)
+
   assert.match(searchSource, /\.in\("tmdb_id", tmdbIds\)/)
+
   assert.match(searchSource, /availabilityKey\(show\.id, show\.mediaType/)
+
   assert.match(searchSource, /unavailable=\{!show\.available\}/)
+
   assert.match(cardSource, /aria-disabled=\{unavailable \|\| undefined\}/)
+
   assert.match(cardSource, /onClick=\{unavailable \? undefined/)
+
   assert.match(cardSource, />Unavailable</)
 })
 
 test("dashboard search does not render a close button", () => {
   const dashboardSource = readFileSync(
     new URL("../src/modules/dashboard/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.doesNotMatch(dashboardSource, /aria-label="Close search"/)
+
   assert.match(dashboardSource, /if \(event\.key === "Escape"\)/)
 })
 
 test("movie carousels use mirrored arrowhead SVG controls", () => {
   const dashboardSource = readFileSync(
     new URL("../src/modules/dashboard/components.tsx", import.meta.url),
+
     "utf8",
   )
 
   assert.match(dashboardSource, /function CarouselArrowIcon/)
+
   assert.match(dashboardSource, /direction="left"/)
+
   assert.match(dashboardSource, /direction="right"/)
+
   assert.match(dashboardSource, /translate\(512 0\) scale\(-1 1\)/)
+
   assert.doesNotMatch(dashboardSource, /styles\.scrollArrow\}>‹/)
+
   assert.doesNotMatch(dashboardSource, /styles\.scrollArrow\}>›/)
 })
