@@ -127,14 +127,16 @@ export default function App() {
 
   useEffect(() => {
     const handleProfileUpdated = (event: Event) => {
-      const { profileId, name } = (event as CustomEvent<{
+      const { profileId, name, avatarPath, avatar } = (event as CustomEvent<{
         profileId: number | string
         name: string
+        avatarPath: string
+        avatar: string
       }>).detail
 
       setActiveProfile((current) =>
         current && String(current.id) === String(profileId)
-          ? { ...current, name }
+          ? { ...current, name, avatarPath, avatar }
           : current,
       )
     }

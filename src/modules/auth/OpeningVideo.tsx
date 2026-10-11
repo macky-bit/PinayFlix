@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabase"
 import styles from "./openingVideo.module.css"
 
 const OPENING_VIDEO_BUCKET = "streamflix-media"
-const OPENING_VIDEO_PATH = "opening/streamflix-opening.mp4"
+const OPENING_VIDEO_PATH = "opening/streamflix-opening-desktop.mp4"
 const OPENING_VIDEO_URL = supabase.storage
   .from(OPENING_VIDEO_BUCKET)
   .getPublicUrl(OPENING_VIDEO_PATH).data.publicUrl

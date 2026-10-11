@@ -255,6 +255,110 @@
 	border-color: #EF4444;
 }
 
+.dangerBtn:disabled {
+	cursor: wait;
+	opacity: 0.6;
+}
+
+.alertBackdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 1200;
+	display: grid;
+	place-items: center;
+	padding: 1rem;
+	background: rgba(5, 3, 12, 0.76);
+	backdrop-filter: blur(6px);
+}
+
+.alertDialog {
+	width: min(27rem, 100%);
+	padding: 1.5rem;
+	border: 1px solid rgba(239, 68, 68, 0.34);
+	border-radius: 18px;
+	background: #160e27;
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+	text-align: center;
+}
+
+.alertIcon {
+	display: grid;
+	place-items: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	margin: 0 auto 1rem;
+	border: 1px solid rgba(239, 68, 68, 0.5);
+	border-radius: 50%;
+	background: rgba(239, 68, 68, 0.12);
+	color: #f87171;
+	font-size: 1.25rem;
+	font-weight: 700;
+}
+
+.alertDialog h3 {
+	margin: 0;
+	color: #fff;
+	font-size: 1.15rem;
+	font-weight: 700;
+}
+
+.alertDialog > p {
+	margin: 0.7rem 0 0;
+	color: #b8b2c5;
+	font-size: 0.88rem;
+	line-height: 1.55;
+}
+
+.alertDialog .alertError {
+	color: #fca5a5;
+}
+
+.alertActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+}
+
+.alertCancel,
+.alertConfirm {
+	min-height: 2.5rem;
+	padding: 0.55rem 1rem;
+	border-radius: 9999px;
+	font-family: var(--font-body);
+	font-size: 0.82rem;
+	font-weight: 650;
+	cursor: pointer;
+	transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.alertCancel {
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: transparent;
+	color: #e9e6ef;
+}
+
+.alertCancel:hover {
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.alertConfirm {
+	border: 1px solid #dc2626;
+	background: #dc2626;
+	color: #fff;
+}
+
+.alertConfirm:hover {
+	border-color: #ef4444;
+	background: #ef4444;
+}
+
+.alertCancel:disabled,
+.alertConfirm:disabled {
+	cursor: wait;
+	opacity: 0.58;
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
 	.settingRow,
@@ -268,6 +372,15 @@
 		width: 100%;
 		min-width: 0;
 		flex-basis: auto;
+	}
+
+	.alertActions {
+		flex-direction: column-reverse;
+	}
+
+	.alertCancel,
+	.alertConfirm {
+		width: 100%;
 	}
 
 	.layout {

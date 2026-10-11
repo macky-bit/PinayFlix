@@ -226,10 +226,10 @@ function PrivacyTab() {
 
   const [historyMessage, setHistoryMessage] = useState("")
 
+  const [clearHistoryAlertOpen, setClearHistoryAlertOpen] = useState(false)
+
   async function clearHistory() {
     if (clearingHistory) return
-
-    if (!window.confirm("Permanently clear all watch history?")) return
 
     setClearingHistory(true)
 
@@ -248,6 +248,10 @@ function PrivacyTab() {
     clearContinueWatching()
 
     setHistoryMessage("Watch history cleared.")
+
+    setClearHistoryAlertOpen(false)
+
+    window.alert("Your watch history has been cleared.")
 
     setClearingHistory(false)
   }
@@ -308,7 +312,10 @@ function PrivacyTab() {
           <button
             type="button"
             className={styles.dangerBtn}
-            onClick={() => void clearHistory()}
+            onClick={() => {
+              setHistoryMessage("")
+              setClearHistoryAlertOpen(true)
+            }}
             disabled={clearingHistory}
           >
             {clearingHistory ? "Clearing…" : "Clear History"}
@@ -320,6 +327,59 @@ function PrivacyTab() {
           </p>
         )}
       </div>
+
+      {clearHistoryAlertOpen && (
+        <div
+          className={styles.alertBackdrop}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !clearingHistory) {
+              setClearHistoryAlertOpen(false)
+            }
+          }}
+        >
+          <section
+            className={styles.alertDialog}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="clear-history-alert-title"
+            aria-describedby="clear-history-alert-description"
+          >
+            <span className={styles.alertIcon} aria-hidden="true">
+              !
+            </span>
+            <h3 id="clear-history-alert-title">Clear watch history?</h3>
+            <p id="clear-history-alert-description">
+              This will permanently remove every title from your watch history
+              and Continue Watching. This action cannot be undone.
+            </p>
+
+            {historyMessage && (
+              <p className={styles.alertError} role="alert">
+                {historyMessage}
+              </p>
+            )}
+
+            <div className={styles.alertActions}>
+              <button
+                type="button"
+                className={styles.alertCancel}
+                onClick={() => setClearHistoryAlertOpen(false)}
+                disabled={clearingHistory}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.alertConfirm}
+                onClick={() => void clearHistory()}
+                disabled={clearingHistory}
+              >
+                {clearingHistory ? "Clearing…" : "Yes, clear history"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

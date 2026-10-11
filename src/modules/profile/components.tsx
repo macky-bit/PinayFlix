@@ -50,6 +50,12 @@ type ProfilePreferences = {
   maturity: string
 }
 
+type AvatarOption = {
+  path: string
+
+  url: string
+}
+
 const PROFILE_PREFERENCES_KEY = "sf_profile_preferences_v1"
 
 const DEFAULT_PROFILE_PREFERENCES: ProfilePreferences = {
@@ -416,7 +422,11 @@ function EditProfileModal({
 
   onClose: () => void
 
-  onSaved: (name: string, preferences: ProfilePreferences) => void
+  onSaved: (
+    name: string,
+    preferences: ProfilePreferences,
+    avatar: AvatarOption,
+  ) => void
 }) {
   const [name, setName] = useState(profile.name)
 
@@ -429,6 +439,74 @@ function EditProfileModal({
   const [saving, setSaving] = useState(false)
 
   const [saveError, setSaveError] = useState("")
+
+  const [avatarPath, setAvatarPath] = useState(profile.avatarPath)
+
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl)
+
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
+
+  const [avatarOptions, setAvatarOptions] = useState<AvatarOption[]>([])
+
+  const [avatarsLoading, setAvatarsLoading] = useState(false)
+
+  const [avatarError, setAvatarError] = useState("")
+
+  const hasChanges =
+    name.trim() !== profile.name ||
+    lang !== initialPreferences.language ||
+    maturity !== initialPreferences.maturity ||
+    avatarPath !== profile.avatarPath
+
+  const openAvatarPicker = async () => {
+    setAvatarPickerOpen(true)
+    setAvatarError("")
+
+    if (avatarOptions.length || avatarsLoading) return
+
+    setAvatarsLoading(true)
+
+    const { data: files, error: listError } = await supabase.storage
+      .from("avatar")
+      .list("", { limit: 50, sortBy: { column: "name", order: "asc" } })
+
+    if (listError) {
+      setAvatarError("Profile avatars could not be loaded. Please try again.")
+      setAvatarsLoading(false)
+      return
+    }
+
+    const avatarFiles = (files ?? []).filter((file) => file.id)
+    const paths = avatarFiles.map((file) => file.name)
+    const { data: signedAvatars, error: signedUrlError } =
+      await supabase.storage.from("avatar").createSignedUrls(paths, 60 * 60)
+
+    if (signedUrlError) {
+      setAvatarError("Profile avatars could not be loaded. Please try again.")
+      setAvatarsLoading(false)
+      return
+    }
+
+    const signedUrls = new Map(
+      (signedAvatars ?? [])
+        .filter((avatar) => avatar.signedUrl)
+        .map((avatar) => [avatar.path, avatar.signedUrl]),
+    )
+
+    const options = avatarFiles
+      .map((file) => ({
+        path: file.name,
+        url: signedUrls.get(file.name) ?? "",
+      }))
+      .filter((avatar) => avatar.url)
+
+    setAvatarOptions(options)
+    setAvatarsLoading(false)
+
+    if (!options.length) {
+      setAvatarError("No profile avatars are currently available.")
+    }
+  }
 
   const handleSave = async () => {
     setSaveError("")
@@ -450,13 +528,25 @@ function EditProfileModal({
     setSaving(true)
 
     const { error } =
-      normalizedName === profile.name
-        ? { error: null }
-        : await supabase.rpc("rename_my_member_profile", {
+      avatarPath !== profile.avatarPath
+        ? await supabase.rpc("update_my_member_profile", {
+            selected_profile_id: profile.id,
+
+            selected_profile_name: normalizedName,
+
+            selected_avatar_path: avatarPath,
+
+            selected_pin: null,
+
+            remove_pin: false,
+          })
+        : normalizedName !== profile.name
+          ? await supabase.rpc("rename_my_member_profile", {
             selected_profile_id: profile.id,
 
             selected_profile_name: normalizedName,
           })
+          : { error: null }
 
     if (error) {
       setSaveError(
@@ -474,7 +564,11 @@ function EditProfileModal({
 
     setSaving(false)
 
-    onSaved(normalizedName, { language: lang, maturity })
+    onSaved(
+      normalizedName,
+      { language: lang, maturity },
+      { path: avatarPath, url: avatarUrl },
+    )
   }
 
   return (
@@ -507,11 +601,16 @@ function EditProfileModal({
 
         <div className="flex items-center gap-4 mb-6">
           <Avatar
-            initials={initialsFor(profile.name)}
-            imageUrl={profile.avatarUrl}
+            initials={initialsFor(name)}
+            imageUrl={avatarUrl}
             size="lg"
           />
           <button
+            type="button"
+            onClick={() => void openAvatarPicker()}
+            disabled={saving}
+            aria-expanded={avatarPickerOpen}
+            aria-haspopup="dialog"
             className="text-sm text-[var(--color-taupe)] hover:text-[var(--color-cream)] border border-[var(--color-stone)] hover:border-[var(--color-taupe)] px-3 py-1.5 rounded-sm transition-colors"
             style={{ fontFamily: "'Barlow', sans-serif" }}
           >
@@ -626,9 +725,7 @@ function EditProfileModal({
             disabled={
               saving ||
               !name.trim() ||
-              (name.trim() === profile.name &&
-                lang === initialPreferences.language &&
-                maturity === initialPreferences.maturity)
+              !hasChanges
             }
             className="flex-1 py-2.5 bg-[var(--color-wine)] text-[var(--color-cream)] text-sm rounded-sm hover:bg-[var(--color-ink-soft)] transition-colors"
             style={{ fontFamily: "'Barlow', sans-serif" }}
@@ -636,6 +733,108 @@ function EditProfileModal({
             {saving ? "Saving…" : "Save"}
           </button>
         </div>
+
+        {avatarPickerOpen && (
+          <div
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+            style={{ background: "rgba(8, 5, 15, 0.82)" }}
+            role="presentation"
+            onMouseDown={() => setAvatarPickerOpen(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-sm p-6 shadow-2xl"
+              style={{
+                background: "var(--color-ink-soft)",
+                border: "1px solid var(--color-stone)",
+              }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="choose-avatar-title"
+              aria-busy={avatarsLoading}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <h3
+                    id="choose-avatar-title"
+                    className="text-lg font-bold uppercase tracking-wide text-[var(--color-cream)]"
+                    style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+                  >
+                    Choose an avatar
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--color-taupe)]">
+                    Select an image for this profile.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAvatarPickerOpen(false)}
+                  className="p-1 text-[var(--color-taupe)] transition-colors hover:text-[var(--color-cream)]"
+                  aria-label="Close avatar picker"
+                >
+                  <XIcon />
+                </button>
+              </div>
+
+              {avatarsLoading && (
+                <p className="py-6 text-center text-sm text-[var(--color-taupe)]">
+                  Loading avatars…
+                </p>
+              )}
+
+              {!!avatarOptions.length && (
+                <div className="grid max-h-[55vh] grid-cols-4 gap-3 overflow-y-auto p-1 sm:grid-cols-5">
+                  {avatarOptions.map((avatar, index) => (
+                    <button
+                      key={avatar.path}
+                      type="button"
+                      onClick={() => {
+                        setAvatarPath(avatar.path)
+                        setAvatarUrl(avatar.url)
+                        setSaveError("")
+                        setAvatarPickerOpen(false)
+                      }}
+                      disabled={saving}
+                      aria-label={`Choose avatar ${index + 1}`}
+                      aria-pressed={avatarPath === avatar.path}
+                      className="aspect-square w-full overflow-hidden rounded-sm transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[var(--color-wine)]"
+                      style={{
+                        border:
+                          avatarPath === avatar.path
+                            ? "3px solid var(--color-wine)"
+                            : "1px solid var(--color-stone)",
+                      }}
+                    >
+                      <img
+                        src={avatar.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {avatarError && (
+                <div className="py-4 text-center">
+                  <p role="alert" className="text-sm text-[#ff8a8a]">
+                    {avatarError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarOptions([])
+                      void openAvatarPicker()
+                    }}
+                    className="mt-3 text-sm font-semibold text-[var(--color-cream)] underline"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1933,9 +2132,16 @@ export function ProfileView({
         <EditProfileModal
           profile={profileIdentity}
           onClose={() => setEditOpen(false)}
-          onSaved={(name, preferences) => {
+          onSaved={(name, preferences, avatar) => {
             setProfileIdentity((current) =>
-              current ? { ...current, name } : current,
+              current
+                ? {
+                    ...current,
+                    name,
+                    avatarPath: avatar.path,
+                    avatarUrl: avatar.url,
+                  }
+                : current,
             )
 
             setLanguage(preferences.language)
@@ -1946,7 +2152,12 @@ export function ProfileView({
 
             window.dispatchEvent(
               new CustomEvent("streamflix:profile-updated", {
-                detail: { profileId: profileIdentity.id, name },
+                detail: {
+                  profileId: profileIdentity.id,
+                  name,
+                  avatarPath: avatar.path,
+                  avatar: avatar.url,
+                },
               }),
             )
 

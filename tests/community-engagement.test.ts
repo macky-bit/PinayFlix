@@ -439,26 +439,34 @@ test("dashboard requires the viewer profile selected for the current session", (
   )
 })
 
-test("opening video uses its own public media bucket", () => {
-  const sql = readFileSync(
-    new URL(
-      "../supabase/migrations/20261009211500_publish_opening_video.sql",
-
-      import.meta.url,
-    ),
+test("opening video uses the landscape desktop media asset", () => {
+  const openingStyles = readFileSync(
+    new URL("../src/modules/auth/openingVideo.module.css", import.meta.url),
 
     "utf8",
   )
 
-  assert.match(sql, /'streamflix-media'[\s\S]*true[\s\S]*'video\/mp4'/i)
+  const openingSource = readFileSync(
+    new URL("../src/modules/auth/OpeningVideo.tsx", import.meta.url),
 
-  assert.match(sql, /file_size_limit[\s\S]*52428800/i)
+    "utf8",
+  )
+
+  assert.match(openingSource, /OPENING_VIDEO_BUCKET = "streamflix-media"/)
 
   assert.match(
-    sql,
+    openingSource,
 
-    /drop policy if exists authenticated_can_read_streamflix_opening/i,
+    /OPENING_VIDEO_PATH = "opening\/streamflix-opening-desktop\.mp4"/,
   )
+
+  assert.match(openingSource, /\.getPublicUrl\(OPENING_VIDEO_PATH\)/)
+
+  assert.match(openingStyles, /\.video\s*\{[\s\S]*object-fit:\s*contain/i)
+
+  assert.match(openingStyles, /\.video\s*\{[\s\S]*width:\s*100%/i)
+
+  assert.match(openingStyles, /\.video\s*\{[\s\S]*height:\s*auto/i)
 })
 
 test("help feedback validates image attachments", () => {
@@ -1260,9 +1268,21 @@ test("profile preferences persist and enable Save for non-name changes", () => {
 
   assert.match(profileSource, /writeProfilePreferences\(profile\.id/)
 
-  assert.match(profileSource, /lang === initialPreferences\.language/)
+  assert.match(profileSource, /lang !== initialPreferences\.language/)
 
-  assert.match(profileSource, /maturity === initialPreferences\.maturity/)
+  assert.match(profileSource, /maturity !== initialPreferences\.maturity/)
+
+  assert.match(profileSource, /\.from\("avatar"\)\s*\.list/)
+
+  assert.match(profileSource, /supabase\.rpc\("update_my_member_profile"/)
+
+  assert.match(profileSource, /avatarPath !== profile\.avatarPath/)
+
+  assert.match(profileSource, /aria-pressed=\{avatarPath === avatar\.path\}/)
+
+  assert.match(profileSource, /aria-labelledby="choose-avatar-title"/)
+
+  assert.match(profileSource, /aria-haspopup="dialog"/)
 })
 
 test("Clear History removes remote history and local continue-watching data", () => {
@@ -1294,12 +1314,18 @@ test("Clear History removes remote history and local continue-watching data", ()
 
   assert.match(settingsSource, /supabase\.rpc\("clear_my_watch_history"\)/)
 
-  assert.match(
-    settingsSource,
-    /window\.confirm\("Permanently clear all watch history\?"\)/,
-  )
+  assert.match(settingsSource, /role="alertdialog"/)
+
+  assert.match(settingsSource, /aria-modal="true"/)
+
+  assert.match(settingsSource, /Yes, clear history/)
 
   assert.match(settingsSource, /clearContinueWatching\(\)/)
+
+  assert.match(
+    settingsSource,
+    /window\.alert\("Your watch history has been cleared\."\)/,
+  )
 
   assert.match(storeSource, /export function clearContinueWatching\(\)/)
 
