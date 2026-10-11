@@ -2010,6 +2010,18 @@ textarea:focus-visible {
 	border-color: var(--color-gold-warm);
 }
 
+.trackPlayButtonActive {
+	border-color: var(--color-gold-warm);
+	background: var(--color-gold-warm);
+	color: #1a0f06;
+	box-shadow: 0 0 26px rgba(245, 168, 0, 0.32);
+}
+
+.soundtrackPanel .trackMeta .trackPlaybackStatus {
+	color: var(--color-gold-warm);
+	font-weight: 700;
+}
+
 .trackPlayButton:disabled {
 	cursor: not-allowed;
 	opacity: 0.38;

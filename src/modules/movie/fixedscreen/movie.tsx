@@ -196,19 +196,19 @@ function TrackPlayIcon() {
   )
 }
 
-function youtubeWatchUrl(value: string) {
-  if (!value) return ""
-  try {
-    const url = new URL(value)
-    const hostname = url.hostname.toLowerCase().replace(/^www\./, "")
-    return hostname === "youtube.com" ||
-      hostname === "music.youtube.com" ||
-      hostname === "youtu.be"
-      ? url.toString()
-      : ""
-  } catch {
-    return ""
-  }
+function TrackPauseIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <rect x="6" y="5" width="4" height="14" rx="1" />
+      <rect x="14" y="5" width="4" height="14" rx="1" />
+    </svg>
+  )
 }
 
 function LyricsIcon() {
@@ -449,6 +449,16 @@ export default function WatchScreen({
 
   const [lyricsTrackId, setLyricsTrackId] = useState<string | null>(null)
 
+  const [activeSoundtrackId, setActiveSoundtrackId] = useState<string | null>(
+    null,
+  )
+
+  const [soundtrackPlaying, setSoundtrackPlaying] = useState(false)
+
+  const [soundtrackPlaybackError, setSoundtrackPlaybackError] = useState<
+    string | null
+  >(null)
+
   const [lyricsLookups, setLyricsLookups] =
     useState<Record<string, LyricsLookupState>>({})
 
@@ -466,6 +476,8 @@ export default function WatchScreen({
   const panelCloseRef = useRef<HTMLButtonElement>(null)
 
   const playerVideoRef = useRef<HTMLVideoElement>(null)
+
+  const soundtrackAudioRef = useRef<HTMLAudioElement>(null)
 
   const pendingVideoTimeRef = useRef(0)
 
@@ -767,6 +779,19 @@ export default function WatchScreen({
 
     setLyricsTrackId(null)
 
+    const soundtrackAudio = soundtrackAudioRef.current
+    soundtrackAudio?.pause()
+    if (soundtrackAudio) {
+      soundtrackAudio.removeAttribute("src")
+      soundtrackAudio.load()
+    }
+
+    setActiveSoundtrackId(null)
+
+    setSoundtrackPlaying(false)
+
+    setSoundtrackPlaybackError(null)
+
     setLyricsLookups({})
 
     lyricsRequestVersion.current += 1
@@ -817,6 +842,12 @@ export default function WatchScreen({
       lyricsRequestRef.current?.abort()
     }
   }, [internalContentId])
+
+  useEffect(() => {
+    if (activePanel === "music") return
+
+    soundtrackAudioRef.current?.pause()
+  }, [activePanel])
 
   const loadRefresher = useCallback(async () => {
     const requestVersion = ++refresherRequestVersion.current
@@ -1177,6 +1208,50 @@ export default function WatchScreen({
       })
   }
 
+  const toggleSoundtrackPlayback = async (track: SoundtrackTrack) => {
+    const audio = soundtrackAudioRef.current
+    if (!audio) return
+
+    setSoundtrackPlaybackError(null)
+
+    if (!track.audioUrl) {
+      setSoundtrackPlaybackError(
+        `No playable audio file is stored for “${track.title}”.`,
+      )
+      return
+    }
+
+    if (activeSoundtrackId === track.id && !audio.paused) {
+      audio.pause()
+      return
+    }
+
+    if (activeSoundtrackId !== track.id) {
+      audio.pause()
+      audio.src = track.audioUrl
+      audio.currentTime = 0
+      setActiveSoundtrackId(track.id)
+    } else if (audio.ended || audio.error) {
+      audio.src = track.audioUrl
+      audio.currentTime = 0
+      audio.load()
+    }
+
+    playerVideoRef.current?.pause()
+    setPlaying(false)
+
+    try {
+      await audio.play()
+    } catch (reason: unknown) {
+      setSoundtrackPlaying(false)
+      setSoundtrackPlaybackError(
+        reason instanceof Error
+          ? reason.message
+          : `Unable to play “${track.title}”.`,
+      )
+    }
+  }
+
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen()
@@ -1378,12 +1453,29 @@ export default function WatchScreen({
   const lyricsTrack =
     soundtracks.find((track) => track.id === lyricsTrackId) ?? null
 
+  const activeSoundtrack =
+    soundtracks.find((track) => track.id === activeSoundtrackId) ?? null
+
   const lyricsLookup = lyricsTrack ? lyricsLookups[lyricsTrack.id] : undefined
 
   const playerUiVisible = showControls || !playing || Boolean(activePanel) || settingsOpen
 
   return (
     <div className={styles.page} ref={pageRef}>
+      <audio
+        ref={soundtrackAudioRef}
+        preload="metadata"
+        onPlay={() => setSoundtrackPlaying(true)}
+        onPause={() => setSoundtrackPlaying(false)}
+        onEnded={() => setSoundtrackPlaying(false)}
+        onError={() => {
+          if (!activeSoundtrack) return
+          setSoundtrackPlaying(false)
+          setSoundtrackPlaybackError(
+            `Unable to play “${activeSoundtrack.title}”. Check its direct audio URL in the soundtrack database record.`,
+          )
+        }}
+      />
       <nav className={styles.nav}>
         <div className={styles.navInner}>
           <button
@@ -1444,7 +1536,10 @@ export default function WatchScreen({
             src={activeVideoSource}
             playsInline
             preload="metadata"
-            onPlay={() => setClipStarted(true)}
+            onPlay={() => {
+              setClipStarted(true)
+              soundtrackAudioRef.current?.pause()
+            }}
             onLoadedMetadata={(event) => {
               const resumeAt = refresherVideoPlaying
                 ? 0
@@ -1841,7 +1936,8 @@ export default function WatchScreen({
               <div className={styles.trackList}>
                 {soundtracks.map((track) => {
                   const lyricsOpen = lyricsTrackId === track.id
-                  const youtubeUrl = youtubeWatchUrl(track.referenceUrl)
+                  const trackIsPlaying =
+                    activeSoundtrackId === track.id && soundtrackPlaying
 
                   return (
                     <article
@@ -1854,6 +1950,11 @@ export default function WatchScreen({
                       <div className={styles.trackMeta}>
                         <strong>{track.title}</strong>
                         <small>{track.artist}</small>
+                        {trackIsPlaying && (
+                          <small className={styles.trackPlaybackStatus}>
+                            Now playing
+                          </small>
+                        )}
                         {track.timestamp && (
                           <small>Featured at {track.timestamp}</small>
                         )}
@@ -1866,30 +1967,37 @@ export default function WatchScreen({
                       >
                         <LyricsIcon /> Lyrics
                       </button>
-                      {youtubeUrl ? (
-                        <a
-                          className={styles.trackPlayButton}
-                          href={youtubeUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={`Open ${track.title} on YouTube`}
-                        >
+                      <button
+                        type="button"
+                        className={`${styles.trackPlayButton} ${
+                          trackIsPlaying ? styles.trackPlayButtonActive : ""
+                        }`}
+                        disabled={!track.audioUrl}
+                        aria-label={
+                          !track.audioUrl
+                            ? `Audio unavailable for ${track.title}`
+                            : trackIsPlaying
+                              ? `Pause ${track.title}`
+                              : `Play ${track.title}`
+                        }
+                        aria-pressed={trackIsPlaying}
+                        onClick={() => void toggleSoundtrackPlayback(track)}
+                      >
+                        {trackIsPlaying ? (
+                          <TrackPauseIcon />
+                        ) : (
                           <TrackPlayIcon />
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          className={styles.trackPlayButton}
-                          disabled
-                          aria-label={`YouTube link unavailable for ${track.title}`}
-                        >
-                          <TrackPlayIcon />
-                        </button>
-                      )}
+                        )}
+                      </button>
                     </article>
                   )
                 })}
               </div>
+            )}
+            {soundtrackPlaybackError && (
+              <p className={styles.audioError} role="alert">
+                {soundtrackPlaybackError}
+              </p>
             )}
             {lyricsTrack && (
               <section

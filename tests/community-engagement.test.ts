@@ -691,10 +691,11 @@ test("movie soundtrack uses database audio and lyrics instead of placeholders", 
     "utf8",
   )
 
-  assert.match(playerSource, /youtubeWatchUrl\(track\.referenceUrl\)/)
-  assert.match(playerSource, /target="_blank"/)
-  assert.match(playerSource, /Open \$\{track\.title\} on YouTube/)
-  assert.doesNotMatch(playerSource, /soundtrackAudioRef/)
+  assert.match(playerSource, /ref=\{soundtrackAudioRef\}/)
+  assert.match(playerSource, /audio\.src = track\.audioUrl/)
+  assert.match(playerSource, /toggleSoundtrackPlayback\(track\)/)
+  assert.match(playerSource, /`Pause \$\{track\.title\}`/)
+  assert.doesNotMatch(playerSource, /Open \$\{track\.title\} on YouTube/)
 
   assert.match(playerSource, /lyricsTrack\.lyrics/)
 
@@ -707,6 +708,8 @@ test("movie soundtrack uses database audio and lyrics instead of placeholders", 
   assert.match(soundtrackSource, /\.from\("soundtrack"\)/)
 
   assert.match(soundtrackSource, /stream_link/)
+  assert.match(soundtrackSource, /createSignedUrl/)
+  assert.match(soundtrackSource, /SPIDER_MAN_SOUNDTRACK_OBJECT/)
   assert.match(soundtrackSource, /lyrics_instrumental/)
   assert.match(soundtrackSource, /lyrics_source_url/)
   assert.match(playerSource, /track\.instrumental/)
