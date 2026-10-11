@@ -24,6 +24,8 @@ import {
   preferredPlaybackQuality,
 } from "../src/modules/movie/playbackQuality.ts"
 
+import { parseSubtitleCues } from "../src/modules/movie/subtitles.ts"
+
 import { getMemberDestination } from "../src/lib/authRouting.ts"
 
 import {
@@ -710,6 +712,7 @@ test("membership cancellation is authenticated, immediate, and returns to subscr
 
   const appSource = readFileSync(
     new URL("../src/App.tsx", import.meta.url),
+
     "utf8",
   )
 
@@ -774,6 +777,20 @@ test("movie soundtrack uses database audio and lyrics instead of placeholders", 
   assert.match(playerSource, /track\.instrumental/)
 })
 
+test("SRT subtitles are parsed against the simulated movie clock", () => {
+  assert.deepEqual(
+    parseSubtitleCues(
+      "1\r\n00:00:02,500 --> 00:00:05,000\r\nWelcome to New York.\r\n\r\n2\r\n00:01:00,000 --> 00:01:03,250\r\nSpider-Man!",
+    ),
+
+    [
+      { start: 2.5, end: 5, text: "Welcome to New York." },
+
+      { start: 60, end: 63.25, text: "Spider-Man!" },
+    ],
+  )
+})
+
 test("soundtrack lyrics are cached in a private provenance-aware bucket", () => {
   const migration = readFileSync(
     new URL(
@@ -797,6 +814,7 @@ test("soundtrack lyrics are cached in a private provenance-aware bucket", () => 
 
   assert.match(
     migration,
+
     /TO authenticated[\s\S]*FOR SELECT|FOR SELECT[\s\S]*TO authenticated/i,
   )
 
@@ -862,6 +880,7 @@ test("movie refresher resolves and caches verified Wikipedia content", () => {
 
   assert.match(
     functionSource,
+
     /en\.wikipedia\.org\/w\/rest\.php\/v1\/search\/page/,
   )
 
@@ -1063,6 +1082,7 @@ test("profile PIN verification is owner-scoped, hashed, and rate limited", () =>
 test("normal movie playback records watch history and the profile loads it", () => {
   const appSource = readFileSync(
     new URL("../src/App.tsx", import.meta.url),
+
     "utf8",
   )
 
@@ -1110,6 +1130,7 @@ test("watch history RPCs are authenticated and owner scoped", () => {
 
   assert.match(
     sql,
+
     /grant execute on function public\.record_my_watch_progress/i,
   )
 
@@ -1217,6 +1238,7 @@ test("kids profiles do not render maturity rating controls", () => {
 test("profile settings delete the selected owned profile safely", () => {
   const appSource = readFileSync(
     new URL("../src/App.tsx", import.meta.url),
+
     "utf8",
   )
 
@@ -1324,6 +1346,7 @@ test("Clear History removes remote history and local continue-watching data", ()
 
   assert.match(
     settingsSource,
+
     /window\.alert\("Your watch history has been cleared\."\)/,
   )
 
@@ -1405,6 +1428,7 @@ test("subscription downgrades disable overflow profiles without deleting them", 
 
   assert.match(
     sql,
+
     /ORDER BY profile\.display_order, profile\.member_profile_id/i,
   )
 
@@ -1542,6 +1566,7 @@ test("content management ranks Supabase stream totals in a filterable top ten", 
 
   assert.match(
     repositorySource,
+
     /totalStreams: number\(row\.total_streams_count\)/,
   )
 
@@ -1549,6 +1574,7 @@ test("content management ranks Supabase stream totals in a filterable top ten", 
 
   assert.match(
     seedMigration,
+
     /SET total_streams_count = seeded_counts\.stream_count/i,
   )
 })
@@ -1600,6 +1626,7 @@ test("dashboard footer keeps only support and legal links", () => {
 
   assert.match(
     dashboardSource,
+
     /onNavigateHelp=\{\(\) => onNavigate\("help"\)\}/,
   )
 })

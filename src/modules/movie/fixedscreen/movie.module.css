@@ -99,20 +99,41 @@
 	transition: opacity 220ms ease;
 }
 
-.subtitleSizeSmall::cue {
+.subtitleSizeSmall::cue,
+.subtitleOverlay.subtitleSizeSmall {
 	font-size: 3vh;
 }
 
-.subtitleSizeMedium::cue {
+.subtitleSizeMedium::cue,
+.subtitleOverlay.subtitleSizeMedium {
 	font-size: 4vh;
 }
 
-.subtitleSizeLarge::cue {
+.subtitleSizeLarge::cue,
+.subtitleOverlay.subtitleSizeLarge {
 	font-size: 5vh;
 }
 
-.subtitleSizeExtraLarge::cue {
+.subtitleSizeExtraLarge::cue,
+.subtitleOverlay.subtitleSizeExtraLarge {
 	font-size: 6vh;
+}
+
+.subtitleOverlay {
+	position: absolute;
+	left: 50%;
+	bottom: clamp(5.5rem, 14%, 8rem);
+	z-index: 9;
+	max-width: min(80%, 60rem);
+	margin: 0;
+	color: #fff;
+	font-weight: 600;
+	line-height: 1.25;
+	text-align: center;
+	white-space: pre-line;
+	text-shadow: 0 2px 4px #000, 0 0 8px #000;
+	transform: translateX(-50%);
+	pointer-events: none;
 }
 
 .playerVideoHidden {

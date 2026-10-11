@@ -22,14 +22,11 @@ import { loadSoundtracks, type SoundtrackTrack } from "../soundtrack"
 
 import { loadTrackLyrics, type TrackLyricsResult } from "../lyrics"
 
-import { loadSubtitleTrack } from "../subtitles"
+import { loadSubtitleTrack, type SubtitleCue } from "../subtitles"
 
 import { useSubtitleSize } from "../../settings/subtitlePreferences"
 
-import {
-  loadWikipediaRefresher,
-  type WikipediaRefresher,
-} from "../refresher"
+import { loadWikipediaRefresher, type WikipediaRefresher } from "../refresher"
 
 import { createRefresherVideoUrl } from "../refresherVideo"
 
@@ -82,16 +79,17 @@ type ActivePanel = "music" | "refresher" | "comments" | "episodes" | null
 
 type LyricsLookupState = { status: "loading" } | {
   status: "ready"
+
   result: TrackLyricsResult
 } | { status: "not-found" } | { status: "error" }
 
-type RefresherLookupState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "ready"; result: WikipediaRefresher }
-  | { status: "error"; message: string }
+type RefresherLookupState = { status: "idle" } | { status: "loading" } | {
+  status: "ready"
+  result: WikipediaRefresher
+} | { status: "error" message: string }
 
 const MOVIE_FALLBACK_SECONDS = 2 * 60 * 60
+
 const REFRESHER_SKIP_DELAY_SECONDS = 5
 
 function loadProgress(): Record<string, number> {
@@ -374,7 +372,7 @@ export default function WatchScreen({
 
   const [captions, setCaptions] = useState(false)
 
-  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null)
+  const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[] | null>(null)
 
   const [subtitleLoading, setSubtitleLoading] = useState(false)
 
@@ -402,8 +400,9 @@ export default function WatchScreen({
 
   const [spoilersRevealed, setSpoilersRevealed] = useState(false)
 
-  const [refresherState, setRefresherState] =
-    useState<RefresherLookupState>({ status: "idle" })
+  const [refresherState, setRefresherState] = useState<RefresherLookupState>({
+    status: "idle",
+  })
 
   const [refresherVideoUrl, setRefresherVideoUrl] = useState("")
 
@@ -467,9 +466,8 @@ export default function WatchScreen({
 
   const [soundtrackPlaying, setSoundtrackPlaying] = useState(false)
 
-  const [soundtrackPlaybackError, setSoundtrackPlaybackError] = useState<
-    string | null
-  >(null)
+  const [soundtrackPlaybackError, setSoundtrackPlaybackError] =
+    useState<string | null>(null)
 
   const [lyricsLookups, setLyricsLookups] =
     useState<Record<string, LyricsLookupState>>({})
@@ -480,6 +478,7 @@ export default function WatchScreen({
 
   const watchHistorySyncRef = useRef<{
     contentId: number
+
     playbackSeconds: number
   } | null>(null)
 
@@ -490,8 +489,6 @@ export default function WatchScreen({
   const playerVideoRef = useRef<HTMLVideoElement>(null)
 
   const soundtrackAudioRef = useRef<HTMLAudioElement>(null)
-
-  const subtitleUrlRef = useRef<string | null>(null)
 
   const pendingVideoTimeRef = useRef(0)
 
@@ -504,6 +501,7 @@ export default function WatchScreen({
   useEffect(() => {
     if (!refresherVideoPlaying) {
       setRefresherSkipSeconds(REFRESHER_SKIP_DELAY_SECONDS)
+
       return
     }
 
@@ -577,6 +575,7 @@ export default function WatchScreen({
     setSubscriptionLoading(true)
 
     void supabase
+
       .rpc("get_my_subscription_state")
 
       .then(({ data, error }) => {
@@ -620,6 +619,10 @@ export default function WatchScreen({
 
   const current = progress[contentId] ?? 0
 
+  const activeSubtitle = subtitleCues?.find(
+    (cue) => current >= cue.start && current < cue.end,
+  )
+
   const percent = duration > 0 ? Math.min((current / duration) * 100, 100) : 0
 
   const watched = percent >= 95
@@ -640,58 +643,43 @@ export default function WatchScreen({
   const videoSource = PLAYBACK_SOURCE_BY_QUALITY[selectedQuality]
 
   const activeVideoSource =
-    refresherVideoPlaying && refresherVideoUrl
-      ? refresherVideoUrl
-      : videoSource
+    refresherVideoPlaying && refresherVideoUrl ? refresherVideoUrl : videoSource
 
   useEffect(() => {
     let active = true
+
     setSubtitleLoading(true)
+
     setSubtitleError(false)
-    setSubtitleUrl(null)
+
+    setSubtitleCues(null)
+
     setCaptions(false)
 
     void loadSubtitleTrack(supabase, id, isSeries)
-      .then((url) => {
-        if (!active) {
-          if (url) URL.revokeObjectURL(url)
-          return
-        }
 
-        if (subtitleUrlRef.current) {
-          URL.revokeObjectURL(subtitleUrlRef.current)
-        }
+      .then((cues) => {
+        if (!active) return
 
-        subtitleUrlRef.current = url
-        setSubtitleUrl(url)
+        setSubtitleCues(cues)
+
         setSubtitleLoading(false)
       })
+
       .catch((reason: unknown) => {
         if (!active) return
+
         console.error("Unable to load title subtitles", reason)
+
         setSubtitleError(true)
+
         setSubtitleLoading(false)
       })
 
     return () => {
       active = false
-      if (subtitleUrlRef.current) {
-        URL.revokeObjectURL(subtitleUrlRef.current)
-        subtitleUrlRef.current = null
-      }
     }
   }, [id, isSeries])
-
-  useEffect(() => {
-    const video = playerVideoRef.current
-    if (!video) return
-
-    for (const track of Array.from(video.textTracks)) {
-      if (track.kind === "subtitles") {
-        track.mode = captions ? "showing" : "disabled"
-      }
-    }
-  }, [captions, subtitleUrl])
 
   useEffect(() => {
     const video = playerVideoRef.current
@@ -757,9 +745,13 @@ export default function WatchScreen({
     })
   }, [
     clipEnded,
+
     playing,
+
     selectedQuality,
+
     refresherVideoPlaying,
+
     refresherVideoUrl,
   ])
 
@@ -843,9 +835,12 @@ export default function WatchScreen({
     setLyricsTrackId(null)
 
     const soundtrackAudio = soundtrackAudioRef.current
+
     soundtrackAudio?.pause()
+
     if (soundtrackAudio) {
       soundtrackAudio.removeAttribute("src")
+
       soundtrackAudio.load()
     }
 
@@ -914,28 +909,37 @@ export default function WatchScreen({
 
   const loadRefresher = useCallback(async () => {
     const requestVersion = ++refresherRequestVersion.current
+
     setSpoilersRevealed(false)
 
     if (internalContentId === null) {
       setRefresherState({
         status: "error",
+
         message: "This title is not connected to the StreamFlix catalog.",
       })
+
       return
     }
 
     setRefresherState({ status: "loading" })
+
     try {
       const result = await loadWikipediaRefresher(
         supabase,
+
         internalContentId,
       )
+
       if (requestVersion !== refresherRequestVersion.current) return
+
       setRefresherState({ status: "ready", result })
     } catch (reason) {
       if (requestVersion !== refresherRequestVersion.current) return
+
       setRefresherState({
         status: "error",
+
         message:
           reason instanceof Error
             ? reason.message
@@ -947,10 +951,14 @@ export default function WatchScreen({
   useEffect(() => {
     if (activePanel === "refresher") {
       void loadRefresher()
+
       return
     }
+
     refresherRequestVersion.current += 1
+
     setRefresherState({ status: "idle" })
+
     setSpoilersRevealed(false)
   }, [activePanel, loadRefresher, selectedEpisode?.ep])
 
@@ -988,7 +996,9 @@ export default function WatchScreen({
       return
 
     const playbackSeconds = Math.floor(current)
+
     const previousSync = watchHistorySyncRef.current
+
     const shouldSync =
       previousSync === null ||
       previousSync.contentId !== internalContentId ||
@@ -997,29 +1007,42 @@ export default function WatchScreen({
     if (!shouldSync) return
 
     const syncPoint = { contentId: internalContentId, playbackSeconds }
+
     watchHistorySyncRef.current = syncPoint
 
     onProgress?.(
-      Math.max(1, Math.min(100, Math.round((playbackSeconds / duration) * 100))),
+      Math.max(
+        1,
+        Math.min(100, Math.round((playbackSeconds / duration) * 100)),
+      ),
     )
 
     void recordWatchProgress(
       supabase,
+
       internalContentId,
+
       playbackSeconds,
+
       activeProfile?.id ?? 0,
     ).catch((error: unknown) => {
       if (watchHistorySyncRef.current === syncPoint) {
         watchHistorySyncRef.current = null
       }
+
       console.error("Unable to record watch history", error)
     })
   }, [
     current,
+
     duration,
+
     internalContentId,
+
     onProgress,
+
     playing,
+
     refresherVideoPlaying,
   ])
 
@@ -1067,6 +1090,7 @@ export default function WatchScreen({
     }
 
     window.addEventListener("keydown", handleEscape)
+
     return () => window.removeEventListener("keydown", handleEscape)
   }, [commentActionPending, deleteCommentId])
 
@@ -1075,11 +1099,13 @@ export default function WatchScreen({
 
     if (!playing || activePanel || settingsOpen) {
       setShowControls(true)
+
       return
     }
 
     controlsTimer.current = setTimeout(() => {
       setShowControls(false)
+
       controlsTimer.current = null
     }, 3000)
 
@@ -1159,19 +1185,31 @@ export default function WatchScreen({
 
   const finishRefresherVideo = useCallback((notice?: string) => {
     const video = playerVideoRef.current
+
     video?.pause()
+
     if (video) video.currentTime = 0
 
     pendingVideoTimeRef.current = 0
+
     setRefresherVideoPlaying(false)
+
     setRefresherVideoUrl("")
+
     setRefresherVideoLoading(false)
+
     setClipStarted(false)
+
     setClipEnded(false)
+
     setSettingsOpen(false)
+
     setActivePanel(null)
+
     setShowControls(true)
+
     setPlaying(true)
+
     setVideoError(notice ?? null)
   }, [])
 
@@ -1179,26 +1217,42 @@ export default function WatchScreen({
     if (refresherVideoLoading || refresherVideoPlaying) return
 
     setRefresherVideoLoading(true)
+
     setRefresherVideoError(null)
+
     try {
       const signedUrl = await createRefresherVideoUrl(supabase)
+
       const video = playerVideoRef.current
+
       video?.pause()
+
       if (video) video.currentTime = 0
 
       pendingVideoTimeRef.current = 0
+
       setRefresherVideoUrl(signedUrl)
+
       setRefresherVideoPlaying(true)
+
       setRefresherVideoLoading(false)
+
       setClipStarted(false)
+
       setClipEnded(false)
+
       setVideoError(null)
+
       setSettingsOpen(false)
+
       setActivePanel(null)
+
       setShowControls(true)
+
       setPlaying(true)
     } catch (reason) {
       setRefresherVideoLoading(false)
+
       setRefresherVideoError(
         reason instanceof Error
           ? reason.message
@@ -1274,6 +1328,7 @@ export default function WatchScreen({
 
   const toggleSoundtrackPlayback = async (track: SoundtrackTrack) => {
     const audio = soundtrackAudioRef.current
+
     if (!audio) return
 
     setSoundtrackPlaybackError(null)
@@ -1282,32 +1337,41 @@ export default function WatchScreen({
       setSoundtrackPlaybackError(
         `No playable audio file is stored for “${track.title}”.`,
       )
+
       return
     }
 
     if (activeSoundtrackId === track.id && !audio.paused) {
       audio.pause()
+
       return
     }
 
     if (activeSoundtrackId !== track.id) {
       audio.pause()
+
       audio.src = track.audioUrl
+
       audio.currentTime = 0
+
       setActiveSoundtrackId(track.id)
     } else if (audio.ended || audio.error) {
       audio.src = track.audioUrl
+
       audio.currentTime = 0
+
       audio.load()
     }
 
     playerVideoRef.current?.pause()
+
     setPlaying(false)
 
     try {
       await audio.play()
     } catch (reason: unknown) {
       setSoundtrackPlaying(false)
+
       setSoundtrackPlaybackError(
         reason instanceof Error
           ? reason.message
@@ -1340,7 +1404,9 @@ export default function WatchScreen({
 
     const optimistic = optimisticReaction(
       previousCounts,
+
       previousReaction,
+
       nextReaction,
     )
 
@@ -1509,8 +1575,11 @@ export default function WatchScreen({
 
   const confirmCommentDeletion = async () => {
     if (!deleteCommentId) return
+
     const commentId = deleteCommentId
+
     await removeOwnComment(commentId)
+
     setDeleteCommentId(null)
   }
 
@@ -1522,7 +1591,8 @@ export default function WatchScreen({
 
   const lyricsLookup = lyricsTrack ? lyricsLookups[lyricsTrack.id] : undefined
 
-  const playerUiVisible = showControls || !playing || Boolean(activePanel) || settingsOpen
+  const playerUiVisible =
+    showControls || !playing || Boolean(activePanel) || settingsOpen
 
   return (
     <div className={styles.page} ref={pageRef}>
@@ -1534,7 +1604,9 @@ export default function WatchScreen({
         onEnded={() => setSoundtrackPlaying(false)}
         onError={() => {
           if (!activeSoundtrack) return
+
           setSoundtrackPlaying(false)
+
           setSoundtrackPlaybackError(
             `Unable to play “${activeSoundtrack.title}”. Check its direct audio URL in the soundtrack database record.`,
           )
@@ -1595,15 +1667,16 @@ export default function WatchScreen({
           <video
             ref={playerVideoRef}
             className={`${styles.playerVideo} ${
-              styles[`subtitleSize${subtitleSize.replace(/\s/g, "")}` as keyof typeof styles]
-            } ${
-              !clipStarted || clipEnded ? styles.playerVideoHidden : ""
-            }`}
+              styles[
+                (`subtitleSize${subtitleSize.replace(/\s/g, "")}` as keyof typeof styles)
+              ]
+            } ${!clipStarted || clipEnded ? styles.playerVideoHidden : ""}`}
             src={activeVideoSource}
             playsInline
             preload="metadata"
             onPlay={() => {
               setClipStarted(true)
+
               soundtrackAudioRef.current?.pause()
             }}
             onLoadedMetadata={(event) => {
@@ -1611,6 +1684,7 @@ export default function WatchScreen({
                 ? 0
                 : Math.min(
                     pendingVideoTimeRef.current,
+
                     event.currentTarget.duration || 0,
                   )
 
@@ -1621,6 +1695,7 @@ export default function WatchScreen({
             onEnded={() => {
               if (refresherVideoPlaying) {
                 finishRefresherVideo()
+
                 return
               }
 
@@ -1635,6 +1710,7 @@ export default function WatchScreen({
                 finishRefresherVideo(
                   `The refresher video could not be played. The ${selectedQuality}p studio presentation has started.`,
                 )
+
                 return
               }
 
@@ -1649,23 +1725,19 @@ export default function WatchScreen({
                 ? `${contentLabel} refresher video`
                 : `${contentLabel} studio presentation at ${selectedQuality}p`
             }
-          >
-            {subtitleUrl && (
-              <track
-                key={subtitleUrl}
-                kind="subtitles"
-                src={subtitleUrl}
-                srcLang="en"
-                label="English"
-                onLoad={(event) => {
-                  event.currentTarget.track.mode = captions
-                    ? "showing"
-                    : "disabled"
-                }}
-              />
-            )}
-          </video>
+          />
           <div className={styles.playerGradient} />
+          {captions && activeSubtitle && !refresherVideoPlaying && (
+            <p
+              className={`${styles.subtitleOverlay} ${
+                styles[
+                  (`subtitleSize${subtitleSize.replace(/\s/g, "")}` as keyof typeof styles)
+                ]
+              }`}
+            >
+              {activeSubtitle.text}
+            </p>
+          )}
           {refresherVideoPlaying && (
             <button
               type="button"
@@ -1678,11 +1750,15 @@ export default function WatchScreen({
               }
               onClick={(event) => {
                 event.stopPropagation()
+
                 finishRefresherVideo()
               }}
             >
               {refresherSkipSeconds > 0 && (
-                <span className={styles.skipRefresherCountdown} aria-live="polite">
+                <span
+                  className={styles.skipRefresherCountdown}
+                  aria-live="polite"
+                >
                   Skip in {refresherSkipSeconds}
                 </span>
               )}
@@ -1709,213 +1785,213 @@ export default function WatchScreen({
               }`}
               aria-hidden={!showControls && !activePanel && !settingsOpen}
             >
-            <div className={styles.centerControls}>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
+              <div className={styles.centerControls}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
 
-                  seekTo(current - 10)
-                }}
-              >
-                −10
-              </button>
-              <button
-                type="button"
-                className={styles.playButton}
-                aria-label={playing ? "Pause" : "Play"}
-                onClick={(event) => {
-                  event.stopPropagation()
+                    seekTo(current - 10)
+                  }}
+                >
+                  −10
+                </button>
+                <button
+                  type="button"
+                  className={styles.playButton}
+                  aria-label={playing ? "Pause" : "Play"}
+                  onClick={(event) => {
+                    event.stopPropagation()
 
-                  setPlaying((value) => !value)
-                }}
-              >
-                <PlayerIcon playing={playing} />
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
+                    setPlaying((value) => !value)
+                  }}
+                >
+                  <PlayerIcon playing={playing} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
 
-                  seekTo(current + 10)
-                }}
-              >
-                +10
-              </button>
-            </div>
-
-            <div
-              className={styles.bottomControls}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className={styles.scrubber}>
-                <span
-                  className={styles.scrubberFill}
-                  style={{ width: `${percent}%` }}
-                />
-                <span
-                  className={styles.scrubberThumb}
-                  style={{ left: `${percent}%` }}
-                />
-                <input
-                  type="range"
-                  min="0"
-                  max={duration}
-                  step="1"
-                  value={current}
-                  aria-label="Playback position"
-                  aria-valuetext={`${formatTime(current)} of ${formatTime(duration)}`}
-                  onChange={(event) => seekTo(Number(event.target.value))}
-                />
+                    seekTo(current + 10)
+                  }}
+                >
+                  +10
+                </button>
               </div>
-              <div className={styles.controlRow}>
-                <div className={styles.controlGroup}>
-                  <button
-                    type="button"
-                    aria-label={playing ? "Pause" : "Play"}
-                    onClick={() => setPlaying((value) => !value)}
-                  >
-                    <PlayerIcon playing={playing} />
-                  </button>
-                  <span>
-                    {formatTime(current)} / {formatTime(duration)}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label={muted ? "Unmute" : "Mute"}
-                    onClick={() => setMuted((value) => !value)}
-                  >
-                    {muted ? "🔇" : "🔊"}
-                  </button>
+
+              <div
+                className={styles.bottomControls}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className={styles.scrubber}>
+                  <span
+                    className={styles.scrubberFill}
+                    style={{ width: `${percent}%` }}
+                  />
+                  <span
+                    className={styles.scrubberThumb}
+                    style={{ left: `${percent}%` }}
+                  />
                   <input
                     type="range"
                     min="0"
-                    max="100"
-                    value={muted ? 0 : volume}
-                    aria-label="Volume"
-                    onChange={(event) => {
-                      setVolume(Number(event.target.value))
-
-                      setMuted(false)
-                    }}
+                    max={duration}
+                    step="1"
+                    value={current}
+                    aria-label="Playback position"
+                    aria-valuetext={`${formatTime(current)} of ${formatTime(duration)}`}
+                    onChange={(event) => seekTo(Number(event.target.value))}
                   />
                 </div>
-                <div className={styles.controlGroup}>
-                  <button
-                    type="button"
-                    className={captions ? styles.activeControl : ""}
-                    disabled={!subtitleUrl}
-                    aria-label={
-                      subtitleUrl
-                        ? captions
-                          ? "Turn subtitles off"
-                          : "Turn English subtitles on"
-                        : subtitleLoading
-                          ? "Subtitles are loading"
-                          : "Subtitles unavailable for this title"
-                    }
-                    aria-pressed={captions}
-                    onClick={() => setCaptions((value) => !value)}
-                  >
-                    CC
-                  </button>
-                  <div className={styles.settingsAnchor}>
+                <div className={styles.controlRow}>
+                  <div className={styles.controlGroup}>
                     <button
                       type="button"
-                      className={settingsOpen ? styles.activeControl : ""}
-                      aria-label="Subtitles and video quality"
-                      aria-expanded={settingsOpen}
-                      onClick={() => {
-                        setSettingsOpen((value) => !value)
-
-                        setShowControls(true)
-                      }}
+                      aria-label={playing ? "Pause" : "Play"}
+                      onClick={() => setPlaying((value) => !value)}
                     >
-                      <SettingsIcon />
+                      <PlayerIcon playing={playing} />
                     </button>
-                    {settingsOpen && (
-                      <div
-                        className={styles.playbackSettings}
-                        role="dialog"
-                        aria-label="Playback settings"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <section>
-                          <h3>Video quality</h3>
-                          <p>
-                            {subscriptionLoading
-                              ? "Checking your plan…"
-                              : `${subscriptionPlan} plan`}
-                          </p>
-                          <div className={styles.settingOptions}>
-                            {PLAYBACK_QUALITIES.map((quality) => {
-                              const available =
-                                allowedQualities.includes(quality)
+                    <span>
+                      {formatTime(current)} / {formatTime(duration)}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={muted ? "Unmute" : "Mute"}
+                      onClick={() => setMuted((value) => !value)}
+                    >
+                      {muted ? "🔇" : "🔊"}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={muted ? 0 : volume}
+                      aria-label="Volume"
+                      onChange={(event) => {
+                        setVolume(Number(event.target.value))
 
-                              return (
-                                <button
-                                  key={quality}
-                                  type="button"
-                                  disabled={!available || subscriptionLoading}
-                                  aria-pressed={selectedQuality === quality}
-                                  onClick={() => changeQuality(quality)}
-                                >
-                                  <span>{quality}p</span>
-                                  <small>
-                                    {available
-                                      ? selectedQuality === quality
-                                        ? "Selected"
-                                        : "Available"
-                                      : `${requiredPlanForQuality(quality)} plan`}
-                                  </small>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </section>
-                        <section>
-                          <h3>Subtitles</h3>
-                          <div className={styles.settingOptions}>
-                            <button
-                              type="button"
-                              aria-pressed={!captions}
-                              onClick={() => setCaptions(false)}
-                            >
-                              <span>Off</span>
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={captions}
-                              disabled={!subtitleUrl}
-                              onClick={() => setCaptions(true)}
-                            >
-                              <span>
-                                {subtitleLoading
-                                  ? "Loading"
-                                  : subtitleUrl
-                                    ? "English"
-                                    : subtitleError
-                                      ? "Failed to load"
-                                      : "Unavailable"}
-                              </span>
-                            </button>
-                          </div>
-                        </section>
-                      </div>
-                    )}
+                        setMuted(false)
+                      }}
+                    />
                   </div>
-                  <button
-                    type="button"
-                    aria-label={
-                      isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
-                    }
-                    onClick={() => void toggleFullscreen()}
-                  >
-                    <ExpandIcon active={isFullscreen} />
-                  </button>
+                  <div className={styles.controlGroup}>
+                    <button
+                      type="button"
+                      className={captions ? styles.activeControl : ""}
+                      disabled={!subtitleCues}
+                      aria-label={
+                        subtitleCues
+                          ? captions
+                            ? "Turn subtitles off"
+                            : "Turn English subtitles on"
+                          : subtitleLoading
+                            ? "Subtitles are loading"
+                            : "Subtitles unavailable for this title"
+                      }
+                      aria-pressed={captions}
+                      onClick={() => setCaptions((value) => !value)}
+                    >
+                      CC
+                    </button>
+                    <div className={styles.settingsAnchor}>
+                      <button
+                        type="button"
+                        className={settingsOpen ? styles.activeControl : ""}
+                        aria-label="Subtitles and video quality"
+                        aria-expanded={settingsOpen}
+                        onClick={() => {
+                          setSettingsOpen((value) => !value)
+
+                          setShowControls(true)
+                        }}
+                      >
+                        <SettingsIcon />
+                      </button>
+                      {settingsOpen && (
+                        <div
+                          className={styles.playbackSettings}
+                          role="dialog"
+                          aria-label="Playback settings"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <section>
+                            <h3>Video quality</h3>
+                            <p>
+                              {subscriptionLoading
+                                ? "Checking your plan…"
+                                : `${subscriptionPlan} plan`}
+                            </p>
+                            <div className={styles.settingOptions}>
+                              {PLAYBACK_QUALITIES.map((quality) => {
+                                const available =
+                                  allowedQualities.includes(quality)
+
+                                return (
+                                  <button
+                                    key={quality}
+                                    type="button"
+                                    disabled={!available || subscriptionLoading}
+                                    aria-pressed={selectedQuality === quality}
+                                    onClick={() => changeQuality(quality)}
+                                  >
+                                    <span>{quality}p</span>
+                                    <small>
+                                      {available
+                                        ? selectedQuality === quality
+                                          ? "Selected"
+                                          : "Available"
+                                        : `${requiredPlanForQuality(quality)} plan`}
+                                    </small>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </section>
+                          <section>
+                            <h3>Subtitles</h3>
+                            <div className={styles.settingOptions}>
+                              <button
+                                type="button"
+                                aria-pressed={!captions}
+                                onClick={() => setCaptions(false)}
+                              >
+                                <span>Off</span>
+                              </button>
+                              <button
+                                type="button"
+                                aria-pressed={captions}
+                                disabled={!subtitleCues}
+                                onClick={() => setCaptions(true)}
+                              >
+                                <span>
+                                  {subtitleLoading
+                                    ? "Loading"
+                                    : subtitleCues
+                                      ? "English"
+                                      : subtitleError
+                                        ? "Failed to load"
+                                        : "Unavailable"}
+                                </span>
+                              </button>
+                            </div>
+                          </section>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={
+                        isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                      }
+                      onClick={() => void toggleFullscreen()}
+                    >
+                      <ExpandIcon active={isFullscreen} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           )}
         </section>
@@ -2037,14 +2113,12 @@ export default function WatchScreen({
               <div className={styles.trackList}>
                 {soundtracks.map((track) => {
                   const lyricsOpen = lyricsTrackId === track.id
+
                   const trackIsPlaying =
                     activeSoundtrackId === track.id && soundtrackPlaying
 
                   return (
-                    <article
-                      className={styles.trackRow}
-                      key={track.id}
-                    >
+                    <article className={styles.trackRow} key={track.id}>
                       <span className={styles.musicTile}>
                         <MusicIcon />
                       </span>
@@ -2236,12 +2310,10 @@ export default function WatchScreen({
                   ? "Preparing Refresher…"
                   : "Play Refresher"}
               </button>
-              {refresherVideoError && (
-                <p role="alert">{refresherVideoError}</p>
-              )}
+              {refresherVideoError && <p role="alert">{refresherVideoError}</p>}
             </div>
-            {refresherState.status === "ready" && (
-              !spoilersRevealed ? (
+            {refresherState.status === "ready" &&
+              (!spoilersRevealed ? (
                 <button
                   type="button"
                   className={styles.spoilerButton}
@@ -2251,36 +2323,39 @@ export default function WatchScreen({
                 </button>
               ) : (
                 <div className={styles.refresherGrid}>
-                <RefresherSection
-                  title="Key Events"
-                  items={
-                    refresherState.status === "ready" &&
-                    refresherState.result.events.length
-                      ? refresherState.result.events
-                      : ["Wikipedia does not provide a structured plot section for this title."]
-                  }
-                />
-                <RefresherSection
-                  title="Important Characters"
-                  items={
-                    refresherState.status === "ready" &&
-                    refresherState.result.characters.length
-                      ? refresherState.result.characters
-                      : ["Wikipedia does not provide a structured character list for this title."]
-                  }
-                />
-                <RefresherSection
-                  title="Key Details to Remember"
-                  items={
-                    refresherState.status === "ready" &&
-                    refresherState.result.keyDetails.length
-                      ? refresherState.result.keyDetails
-                      : ["No additional verified story details were found."]
-                  }
-                />
+                  <RefresherSection
+                    title="Key Events"
+                    items={
+                      refresherState.status === "ready" &&
+                      refresherState.result.events.length
+                        ? refresherState.result.events
+                        : [
+                            "Wikipedia does not provide a structured plot section for this title.",
+                          ]
+                    }
+                  />
+                  <RefresherSection
+                    title="Important Characters"
+                    items={
+                      refresherState.status === "ready" &&
+                      refresherState.result.characters.length
+                        ? refresherState.result.characters
+                        : [
+                            "Wikipedia does not provide a structured character list for this title.",
+                          ]
+                    }
+                  />
+                  <RefresherSection
+                    title="Key Details to Remember"
+                    items={
+                      refresherState.status === "ready" &&
+                      refresherState.result.keyDetails.length
+                        ? refresherState.result.keyDetails
+                        : ["No additional verified story details were found."]
+                    }
+                  />
                 </div>
-              )
-            )}
+              ))}
           </section>
         )}
 
@@ -2551,6 +2626,7 @@ export default function WatchScreen({
                               disabled={commentActionPending === comment.id}
                               onClick={() => {
                                 setEditingCommentId(null)
+
                                 setEditingCommentText("")
                               }}
                             >
@@ -2568,6 +2644,7 @@ export default function WatchScreen({
                             disabled={commentActionPending === comment.id}
                             onClick={() => {
                               setEditingCommentId(comment.id)
+
                               setEditingCommentText(comment.text)
                             }}
                           >
@@ -2617,7 +2694,8 @@ export default function WatchScreen({
               <div>
                 <h2 id="comment-delete-title">Delete comment?</h2>
                 <p id="comment-delete-description">
-                  This comment will be permanently deleted and cannot be recovered.
+                  This comment will be permanently deleted and cannot be
+                  recovered.
                 </p>
               </div>
             </div>
@@ -2646,4 +2724,3 @@ export default function WatchScreen({
     </div>
   )
 }
-
