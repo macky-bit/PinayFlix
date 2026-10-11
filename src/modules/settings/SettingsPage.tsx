@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react"
+import { useState } from "react"
 
 import StreamFlixSelect from "../../components/StreamFlixSelect"
 
@@ -8,10 +8,17 @@ import { supabase } from "../../lib/supabase"
 
 import { clearContinueWatching } from "../dashboard/continueWatchingStore"
 
+import {
+  readSubtitleSize,
+  SUBTITLE_SIZE_OPTIONS,
+  writeSubtitleSize,
+} from "./subtitlePreferences"
+
 import styles from "./settings.module.css"
 
 interface Props {
   onBack: () => void
+  activeProfileId: number
 }
 
 type Tab = "playback" | "notifications" | "privacy" | "appearance"
@@ -215,7 +222,7 @@ function NotificationsTab() {
   )
 }
 
-function PrivacyTab() {
+function PrivacyTab({ profileId }: { profileId: number }) {
   const [watchHistory, setWatchHistory] = useState(true)
 
   const [searchHistory, setSearchHistory] = useState(true)
@@ -235,7 +242,9 @@ function PrivacyTab() {
 
     setHistoryMessage("")
 
-    const { error } = await supabase.rpc("clear_my_watch_history")
+    const { error } = await supabase.rpc("clear_my_watch_history", {
+      selected_profile_id: profileId,
+    })
 
     if (error) {
       setHistoryMessage(error.message || "Watch history could not be cleared.")
@@ -245,7 +254,7 @@ function PrivacyTab() {
       return
     }
 
-    clearContinueWatching()
+    clearContinueWatching(profileId)
 
     setHistoryMessage("Watch history cleared.")
 
@@ -306,7 +315,7 @@ function PrivacyTab() {
           <div>
             <p className={styles.settingLabel}>Clear watch history</p>
             <p className={styles.settingDesc}>
-              Permanently remove all viewing history.
+              Permanently remove viewing history for this profile only.
             </p>
           </div>
           <button
@@ -349,8 +358,9 @@ function PrivacyTab() {
             </span>
             <h3 id="clear-history-alert-title">Clear watch history?</h3>
             <p id="clear-history-alert-description">
-              This will permanently remove every title from your watch history
-              and Continue Watching. This action cannot be undone.
+              This will permanently remove every title from this profile's watch
+              history and Continue Watching. Other profiles will not be
+              affected. This action cannot be undone.
             </p>
 
             {historyMessage && (
@@ -389,7 +399,7 @@ function AppearanceTab() {
 
   const [language, setLanguage] = useState("English")
 
-  const [subtitleSize, setSubtitleSize] = useState("Medium")
+  const [subtitleSize, setSubtitleSize] = useState(readSubtitleSize)
 
   return (
     <div className={styles.tabContent}>
@@ -436,8 +446,11 @@ function AppearanceTab() {
           <Select
             value={subtitleSize}
             ariaLabel="Subtitle size"
-            options={["Small", "Medium", "Large", "Extra Large"]}
-            onChange={setSubtitleSize}
+            options={[...SUBTITLE_SIZE_OPTIONS]}
+            onChange={(size) => {
+              setSubtitleSize(size)
+              writeSubtitleSize(size)
+            }}
           />
         </div>
       </div>
@@ -445,17 +458,7 @@ function AppearanceTab() {
   )
 }
 
-const TAB_CONTENT: Record<Tab, ReactElement> = {
-  playback: <PlaybackTab />,
-
-  notifications: <NotificationsTab />,
-
-  privacy: <PrivacyTab />,
-
-  appearance: <AppearanceTab />,
-}
-
-export default function SettingsPage({ onBack }: Props) {
+export default function SettingsPage({ onBack, activeProfileId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("playback")
 
   return (
@@ -505,7 +508,14 @@ export default function SettingsPage({ onBack }: Props) {
           </nav>
 
           {/* Content panel */}
-          <div className={styles.panel}>{TAB_CONTENT[activeTab]}</div>
+          <div className={styles.panel}>
+            {activeTab === "playback" && <PlaybackTab />}
+            {activeTab === "notifications" && <NotificationsTab />}
+            {activeTab === "privacy" && (
+              <PrivacyTab profileId={activeProfileId} />
+            )}
+            {activeTab === "appearance" && <AppearanceTab />}
+          </div>
         </div>
       </div>
     </div>

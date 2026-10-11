@@ -12,13 +12,17 @@ export interface ContinueEntry {
   updatedAt: number
 }
 
-// v2 intentionally ignores data stored by earlier builds.
-const KEY = "sf_continue_watching_v2"
+// Keep viewing progress isolated by profile on shared subscriber accounts.
+const KEY = "sf_continue_watching_v3"
 const EVENT = "sf-continue-change"
 
-function load(): ContinueEntry[] {
+function storageKey(profileId?: number | null) {
+  return `${KEY}:${profileId ?? "default"}`
+}
+
+function load(profileId?: number | null): ContinueEntry[] {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? "[]")
+    const v = JSON.parse(localStorage.getItem(storageKey(profileId)) ?? "[]")
 
     return Array.isArray(v) ? v : []
   } catch {
@@ -26,8 +30,8 @@ function load(): ContinueEntry[] {
   }
 }
 
-function persist(entries: ContinueEntry[]) {
-  localStorage.setItem(KEY, JSON.stringify(entries))
+function persist(entries: ContinueEntry[], profileId?: number | null) {
+  localStorage.setItem(storageKey(profileId), JSON.stringify(entries))
 
   window.dispatchEvent(new Event(EVENT))
 }
@@ -36,29 +40,43 @@ export function addOrUpdateContinue(
   show: Show,
   progress: number,
   episodeLabel?: string,
+  profileId?: number | null,
 ) {
-  const entries = load().filter(
+  const entries = load(profileId).filter(
     (e) => !(e.show.id === show.id && e.show.mediaType === show.mediaType),
   )
 
-  persist([{ show, progress, episodeLabel, updatedAt: Date.now() }, ...entries])
-}
-
-export function removeContinue(id: number, mediaType: Show["mediaType"]) {
   persist(
-    load().filter((e) => !(e.show.id === id && e.show.mediaType === mediaType)),
+    [{ show, progress, episodeLabel, updatedAt: Date.now() }, ...entries],
+    profileId,
   )
 }
 
-export function clearContinueWatching() {
-  persist([])
+export function removeContinue(
+  id: number,
+  mediaType: Show["mediaType"],
+  profileId?: number | null,
+) {
+  persist(
+    load(profileId).filter(
+      (e) => !(e.show.id === id && e.show.mediaType === mediaType),
+    ),
+    profileId,
+  )
 }
 
-export function useContinueWatching(limit: number | null = 10) {
-  const [entries, setEntries] = useState<ContinueEntry[]>(load)
+export function clearContinueWatching(profileId?: number | null) {
+  persist([], profileId)
+}
+
+export function useContinueWatching(
+  limit: number | null = 10,
+  profileId?: number | null,
+) {
+  const [entries, setEntries] = useState<ContinueEntry[]>(() => load(profileId))
 
   useEffect(() => {
-    const refresh = () => setEntries(load())
+    const refresh = () => setEntries(load(profileId))
 
     window.addEventListener(EVENT, refresh)
 
@@ -69,22 +87,22 @@ export function useContinueWatching(limit: number | null = 10) {
 
       window.removeEventListener("storage", refresh)
     }
-  }, [])
+  }, [profileId])
 
   const markWatched = useCallback(
     (show: Show, progress: number, episodeLabel?: string) => {
-      addOrUpdateContinue(show, progress, episodeLabel)
+      addOrUpdateContinue(show, progress, episodeLabel, profileId)
     },
-    [],
+    [profileId],
   )
 
   const remove = useCallback((id: number, mediaType: Show["mediaType"]) => {
-    removeContinue(id, mediaType)
-  }, [])
+    removeContinue(id, mediaType, profileId)
+  }, [profileId])
 
   const clear = useCallback(() => {
-    clearContinueWatching()
-  }, [])
+    clearContinueWatching(profileId)
+  }, [profileId])
 
   const sorted = [...entries].sort((a, b) => b.updatedAt - a.updatedAt)
 

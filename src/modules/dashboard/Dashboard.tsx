@@ -17,7 +17,13 @@ interface Props {
   onInfo: (show: Show) => void
 
   onNavigate: (
-    page: "account" | "profile" | "help" | "settings" | "admin",
+    page:
+      | "account"
+      | "profile"
+      | "help"
+      | "settings"
+      | "admin"
+      | "profileSelect",
   ) => void
 }
 
@@ -81,6 +87,7 @@ export default function Dashboard({
       {!searchQuery.trim() && view !== "myList" && (
         <CatalogPage
           kind={view}
+          profileId={activeProfile.id}
           onWatch={onWatch}
           onInfo={onInfo}
           onNavigateHelp={() => onNavigate("help")}

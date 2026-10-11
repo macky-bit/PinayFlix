@@ -22,6 +22,10 @@ import { loadSoundtracks, type SoundtrackTrack } from "../soundtrack"
 
 import { loadTrackLyrics, type TrackLyricsResult } from "../lyrics"
 
+import { loadSubtitleTrack } from "../subtitles"
+
+import { useSubtitleSize } from "../../settings/subtitlePreferences"
+
 import {
   loadWikipediaRefresher,
   type WikipediaRefresher,
@@ -370,6 +374,14 @@ export default function WatchScreen({
 
   const [captions, setCaptions] = useState(false)
 
+  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null)
+
+  const [subtitleLoading, setSubtitleLoading] = useState(false)
+
+  const [subtitleError, setSubtitleError] = useState(false)
+
+  const subtitleSize = useSubtitleSize()
+
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>("Basic")
@@ -478,6 +490,8 @@ export default function WatchScreen({
   const playerVideoRef = useRef<HTMLVideoElement>(null)
 
   const soundtrackAudioRef = useRef<HTMLAudioElement>(null)
+
+  const subtitleUrlRef = useRef<string | null>(null)
 
   const pendingVideoTimeRef = useRef(0)
 
@@ -629,6 +643,55 @@ export default function WatchScreen({
     refresherVideoPlaying && refresherVideoUrl
       ? refresherVideoUrl
       : videoSource
+
+  useEffect(() => {
+    let active = true
+    setSubtitleLoading(true)
+    setSubtitleError(false)
+    setSubtitleUrl(null)
+    setCaptions(false)
+
+    void loadSubtitleTrack(supabase, id, isSeries)
+      .then((url) => {
+        if (!active) {
+          if (url) URL.revokeObjectURL(url)
+          return
+        }
+
+        if (subtitleUrlRef.current) {
+          URL.revokeObjectURL(subtitleUrlRef.current)
+        }
+
+        subtitleUrlRef.current = url
+        setSubtitleUrl(url)
+        setSubtitleLoading(false)
+      })
+      .catch((reason: unknown) => {
+        if (!active) return
+        console.error("Unable to load title subtitles", reason)
+        setSubtitleError(true)
+        setSubtitleLoading(false)
+      })
+
+    return () => {
+      active = false
+      if (subtitleUrlRef.current) {
+        URL.revokeObjectURL(subtitleUrlRef.current)
+        subtitleUrlRef.current = null
+      }
+    }
+  }, [id, isSeries])
+
+  useEffect(() => {
+    const video = playerVideoRef.current
+    if (!video) return
+
+    for (const track of Array.from(video.textTracks)) {
+      if (track.kind === "subtitles") {
+        track.mode = captions ? "showing" : "disabled"
+      }
+    }
+  }, [captions, subtitleUrl])
 
   useEffect(() => {
     const video = playerVideoRef.current
@@ -944,6 +1007,7 @@ export default function WatchScreen({
       supabase,
       internalContentId,
       playbackSeconds,
+      activeProfile?.id ?? 0,
     ).catch((error: unknown) => {
       if (watchHistorySyncRef.current === syncPoint) {
         watchHistorySyncRef.current = null
@@ -1531,6 +1595,8 @@ export default function WatchScreen({
           <video
             ref={playerVideoRef}
             className={`${styles.playerVideo} ${
+              styles[`subtitleSize${subtitleSize.replace(/\s/g, "")}` as keyof typeof styles]
+            } ${
               !clipStarted || clipEnded ? styles.playerVideoHidden : ""
             }`}
             src={activeVideoSource}
@@ -1583,7 +1649,22 @@ export default function WatchScreen({
                 ? `${contentLabel} refresher video`
                 : `${contentLabel} studio presentation at ${selectedQuality}p`
             }
-          />
+          >
+            {subtitleUrl && (
+              <track
+                key={subtitleUrl}
+                kind="subtitles"
+                src={subtitleUrl}
+                srcLang="en"
+                label="English"
+                onLoad={(event) => {
+                  event.currentTarget.track.mode = captions
+                    ? "showing"
+                    : "disabled"
+                }}
+              />
+            )}
+          </video>
           <div className={styles.playerGradient} />
           {refresherVideoPlaying && (
             <button
@@ -1723,6 +1804,17 @@ export default function WatchScreen({
                   <button
                     type="button"
                     className={captions ? styles.activeControl : ""}
+                    disabled={!subtitleUrl}
+                    aria-label={
+                      subtitleUrl
+                        ? captions
+                          ? "Turn subtitles off"
+                          : "Turn English subtitles on"
+                        : subtitleLoading
+                          ? "Subtitles are loading"
+                          : "Subtitles unavailable for this title"
+                    }
+                    aria-pressed={captions}
                     onClick={() => setCaptions((value) => !value)}
                   >
                     CC
@@ -1794,9 +1886,18 @@ export default function WatchScreen({
                             <button
                               type="button"
                               aria-pressed={captions}
+                              disabled={!subtitleUrl}
                               onClick={() => setCaptions(true)}
                             >
-                              <span>English</span>
+                              <span>
+                                {subtitleLoading
+                                  ? "Loading"
+                                  : subtitleUrl
+                                    ? "English"
+                                    : subtitleError
+                                      ? "Failed to load"
+                                      : "Unavailable"}
+                              </span>
                             </button>
                           </div>
                         </section>

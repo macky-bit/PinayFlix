@@ -111,6 +111,38 @@
    );
 }
 
+.mediaTypeBadge {
+   position: absolute;
+   top: 0.65rem;
+   left: 0.65rem;
+   z-index: 1;
+   display: inline-flex;
+   align-items: center;
+   min-height: 1.35rem;
+   padding: 0.2rem 0.55rem;
+   border: 1px solid;
+   border-radius: 999px;
+   background: rgba(12, 10, 18, 0.82);
+   backdrop-filter: blur(8px);
+   color: #fff;
+   font-size: 0.62rem;
+   font-weight: 750;
+   line-height: 1;
+   letter-spacing: 0.06em;
+   text-transform: uppercase;
+   white-space: nowrap;
+}
+
+.mediaTypeBadgeMovie {
+   border-color: rgba(245, 168, 0, 0.68);
+   color: #ffd166;
+}
+
+.mediaTypeBadgeSeries {
+   border-color: rgba(167, 139, 250, 0.72);
+   color: #d6c6ff;
+}
+
 .trendingMeta {
    background: #321e48;
 }

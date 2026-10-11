@@ -150,7 +150,7 @@ export default function App() {
   }, [])
 
   const handleWatch = (show: Show) => {
-    addOrUpdateContinue(show, 1)
+    addOrUpdateContinue(show, 1, undefined, activeProfileId)
     setWatchShow(show)
     setPreviewShow(null)
 
@@ -227,7 +227,14 @@ export default function App() {
             onSignOut={handleSignOut}
             onWatch={handleWatch}
             onInfo={handleInfo}
-            onNavigate={(p) => setPage(p)}
+            onNavigate={(p) => {
+              if (p === "profileSelect") {
+                activeProfileIdRef.current = null
+                setActiveProfileId(null)
+                setActiveProfile(null)
+              }
+              setPage(p)
+            }}
           />
           {previewShow && (
             <PreviewModal
@@ -254,7 +261,14 @@ export default function App() {
           backgroundImage={watchShow.hero ?? watchShow.image}
           isSeries={watchShow.mediaType === "tv"}
           activeProfile={activeProfile}
-          onProgress={(progress) => addOrUpdateContinue(watchShow, progress)}
+            onProgress={(progress) =>
+              addOrUpdateContinue(
+                watchShow,
+                progress,
+                undefined,
+                activeProfileId,
+              )
+            }
           onBack={() => setPage("dashboard")}
         />
       )}
@@ -293,7 +307,10 @@ export default function App() {
       {page === "help" && <HelpPage onBack={() => setPage("dashboard")} />}
 
       {page === "settings" && (
-        <SettingsPage onBack={() => setPage("dashboard")} />
+          <SettingsPage
+            activeProfileId={activeProfileId ?? 0}
+            onBack={() => setPage("dashboard")}
+          />
       )}
     </>
   )

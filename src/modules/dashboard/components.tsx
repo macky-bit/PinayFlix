@@ -138,9 +138,20 @@ function ChevronDown() {
   )
 }
 
-type AccountMenuIconName = "profile" | "account" | "settings" | "help" | "signout"
+type AccountMenuIconName =
+  | "profile"
+  | "account"
+  | "settings"
+  | "help"
+  | "switchProfile"
+  | "signout"
 
-type AccountMenuPage = "account" | "profile" | "help" | "settings"
+type AccountMenuPage =
+  | "account"
+  | "profile"
+  | "help"
+  | "settings"
+  | "profileSelect"
 
 const ACCOUNT_MENU_ITEMS: ReadonlyArray<{
   label: string
@@ -151,6 +162,7 @@ const ACCOUNT_MENU_ITEMS: ReadonlyArray<{
   { label: "Account", page: "account", icon: "account" },
   { label: "Settings", page: "settings", icon: "settings" },
   { label: "Help Center", page: "help", icon: "help" },
+  { label: "Change Profile", page: "profileSelect", icon: "switchProfile" },
 ]
 
 function AccountMenuIcon({ name }: { name: AccountMenuIconName }) {
@@ -182,6 +194,13 @@ function AccountMenuIcon({ name }: { name: AccountMenuIconName }) {
         <circle cx="12" cy="12" r="9" />
         <path d="M9.7 9a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.1.9-1.1 1.8" />
         <path d="M12 17h.01" />
+      </>
+    ),
+
+    switchProfile: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3.5 20c.5-3.5 2.3-5.5 5.5-5.5 1.5 0 2.7.4 3.7 1.2M16 8h5m-2-2 2 2-2 2M21 16h-5m2-2-2 2 2 2" />
       </>
     ),
 
@@ -313,6 +332,13 @@ export function TrendingCard({
           className="w-full h-full object-cover"
         />
         <div className={`absolute inset-0 ${styles.trendingCardImgGradient}`} />
+        <span
+          className={`${styles.mediaTypeBadge} ${
+            mediaType === "tv" ? styles.mediaTypeBadgeSeries : styles.mediaTypeBadgeMovie
+          }`}
+        >
+          {mediaType === "tv" ? "TV Series" : "Movie"}
+        </span>
       </div>
 
       {/* metadata always visible */}
@@ -435,7 +461,15 @@ export function ContinueWatchingCard({
           className="w-full h-full object-cover"
         />
         <div className={`absolute inset-0 ${styles.continueImgGradient}`} />
-
+        <span
+          className={`${styles.mediaTypeBadge} ${
+            mediaType === "tv"
+              ? styles.mediaTypeBadgeSeries
+              : styles.mediaTypeBadgeMovie
+          }`}
+        >
+          {mediaType === "tv" ? "TV Series" : "Movie"}
+        </span>
       </div>
 
       {/* bottom bar: title, episode, progress, actions */}
@@ -808,7 +842,13 @@ export function Navbar({
   onSearchQueryChange?: (value: string) => void
 
   onNavigatePage?: (
-    page: "account" | "profile" | "help" | "settings" | "admin",
+    page:
+      | "account"
+      | "profile"
+      | "help"
+      | "settings"
+      | "admin"
+      | "profileSelect",
   ) => void
 
   onNavigateView?: (view: DashboardView) => void
@@ -1666,14 +1706,16 @@ export function ContinueWatchingRow({
   onInfo,
 
   genre = "All",
+  profileId,
 }: {
   onPlay?: (show: Show) => void
 
   onInfo?: (show: Show) => void
 
   genre?: string
+  profileId: number
 }) {
-  const { entries } = useContinueWatching()
+  const { entries } = useContinueWatching(10, profileId)
   const normalizedGenre = genre.trim().toLowerCase()
   const filteredEntries =
     normalizedGenre === "all"

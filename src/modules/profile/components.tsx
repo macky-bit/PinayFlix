@@ -1250,7 +1250,13 @@ function formatPlaybackTime(seconds: number) {
     : `${minutes}:${String(remainingSeconds).padStart(2, "0")}`
 }
 
-function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
+function WatchHistoryPanel({
+  onClose,
+  profileId,
+}: {
+  onClose: () => void
+  profileId: number
+}) {
   const [items, setItems] = useState<WatchHistoryItem[]>([])
 
   const [loading, setLoading] = useState(true)
@@ -1261,7 +1267,7 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
     entries: continueEntries,
 
     remove: removeContinueEntry,
-  } = useContinueWatching(null)
+  } = useContinueWatching(null, profileId)
 
   const loadHistory = useCallback(async () => {
     setLoading(true)
@@ -1270,6 +1276,7 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
 
     const { data, error: historyError } = await supabase.rpc(
       "get_my_watch_history",
+      { selected_profile_id: profileId },
     )
 
     if (historyError) throw historyError
@@ -1303,7 +1310,7 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
     )
 
     setLoading(false)
-  }, [])
+  }, [profileId])
 
   useEffect(() => {
     void loadHistory().catch((loadError: unknown) => {
@@ -1327,7 +1334,7 @@ function WatchHistoryPanel({ onClose }: { onClose: () => void }) {
     const { error: removeError } = await supabase.rpc(
       "delete_my_watch_history_entry",
 
-      { selected_content_id: item.contentId },
+      { selected_content_id: item.contentId, selected_profile_id: profileId },
     )
 
     if (removeError) {
@@ -2180,7 +2187,10 @@ export function ProfileView({
         />
       )}
       {historyOpen && (
-        <WatchHistoryPanel onClose={() => setHistoryOpen(false)} />
+        <WatchHistoryPanel
+          profileId={activeProfileId ?? 0}
+          onClose={() => setHistoryOpen(false)}
+        />
       )}
       {manageOpen && (
         <ManageProfilesModal

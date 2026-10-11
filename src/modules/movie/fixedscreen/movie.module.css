@@ -99,6 +99,22 @@
 	transition: opacity 220ms ease;
 }
 
+.subtitleSizeSmall::cue {
+	font-size: 3vh;
+}
+
+.subtitleSizeMedium::cue {
+	font-size: 4vh;
+}
+
+.subtitleSizeLarge::cue {
+	font-size: 5vh;
+}
+
+.subtitleSizeExtraLarge::cue {
+	font-size: 6vh;
+}
+
 .playerVideoHidden {
 	pointer-events: none;
 	opacity: 0;

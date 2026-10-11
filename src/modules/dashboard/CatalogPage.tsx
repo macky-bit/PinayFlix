@@ -11,6 +11,7 @@ import {
 
 interface CatalogPageProps {
   kind: CatalogKind
+  profileId: number
   onWatch: (show: Show) => void
   onInfo: (show: Show) => void
   onNavigateHelp: () => void
@@ -57,6 +58,7 @@ function CatalogView({
   onWatch,
   onInfo,
   onNavigateHelp,
+  profileId,
 }: CatalogViewProps) {
   const [genre, setGenre] = useState("All")
   const { rows, featured, genres, loading } = data
@@ -89,7 +91,12 @@ function CatalogView({
           setActive={setGenre}
           genres={["All", ...genres.slice(0, 15)]}
         />
-        <ContinueWatchingRow genre={genre} onPlay={onWatch} onInfo={onInfo} />
+        <ContinueWatchingRow
+          genre={genre}
+          profileId={profileId}
+          onPlay={onWatch}
+          onInfo={onInfo}
+        />
         {filteredRows.map((row) => (
           <CarouselRow
             key={row.title}
@@ -111,6 +118,7 @@ export default function CatalogPage({
   onWatch,
   onInfo,
   onNavigateHelp,
+  profileId,
 }: CatalogPageProps) {
   const data = useSupabaseCatalog(kind)
 
@@ -122,6 +130,7 @@ export default function CatalogPage({
         onWatch={onWatch}
         onInfo={onInfo}
         onNavigateHelp={onNavigateHelp}
+        profileId={profileId}
       />
     </div>
   )
