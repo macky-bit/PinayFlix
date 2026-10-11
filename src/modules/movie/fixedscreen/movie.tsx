@@ -2296,7 +2296,7 @@ export default function WatchScreen({
         {activePanel === "comments" && (
           <section className={styles.comments}>
             <div className={styles.featureHeader}>
-              <div>
+              <div className={styles.commentsTitle}>
                 <CommentsIcon />
                 <h2>
                   {comments.length}{" "}
@@ -2342,6 +2342,7 @@ export default function WatchScreen({
                 </small>
                 <button
                   type="button"
+                  className="px-6 py-2.5 bg-[var(--color-wine)] text-[var(--color-cream)] text-sm rounded-sm hover:bg-[var(--color-ink-soft)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-wine)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-ink)]"
                   disabled={
                     commentPending ||
                     !commentDraft.trim() ||

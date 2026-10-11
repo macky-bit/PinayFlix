@@ -484,6 +484,23 @@
 
 .featureHeader > div { gap: 0.55rem; }
 .featureHeader h2 { margin: 0; font-size: 1rem; }
+.commentsTitle {
+	min-width: 0;
+	gap: 0.7rem !important;
+}
+
+.commentsTitle svg {
+	flex: 0 0 auto;
+	width: 1.2rem;
+	height: 1.2rem;
+	color: var(--color-taupe);
+}
+
+.commentsTitle h2 {
+	margin: 0 !important;
+	line-height: 1.15;
+}
+
 .featureHeader > button {
 	border: 0;
 	background: none;
@@ -912,26 +929,32 @@
 	color: var(--color-stone);
 }
 
-.commentComposer button {
+.commentComposer .composerFooter button {
 	display: block;
 	margin-left: auto;
-	padding: 0.5rem 0.9rem;
+	padding: 0.625rem 1.5rem;
 	border: 0;
-	border-radius: 0.3rem;
+	border-radius: 0.125rem;
 	background: var(--color-wine);
 	color: var(--color-cream);
+	font-size: 0.875rem;
 	cursor: pointer;
-	transition: background 0.15s ease;
+	transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.commentComposer button:hover {
-	background: var(--color-wine-hover);
+.commentComposer .composerFooter button:hover:not(:disabled) {
+	background: var(--color-ink-soft);
 }
 
-.commentComposer button:disabled,
+.commentComposer .composerFooter button:focus-visible {
+	outline: 2px solid var(--color-wine);
+	outline-offset: 2px;
+}
+
+.commentComposer .composerFooter button:disabled,
 .commentComposer textarea:disabled {
 	cursor: not-allowed;
-	opacity: 0.55;
+	opacity: 0.4;
 }
 
 .engagementError {
